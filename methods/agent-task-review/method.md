@@ -15,6 +15,18 @@
 7. **Repeat with a second agent** where possible. A failure that two different agents share is stronger evidence of a docs gap than a failure in one.
 8. **Report.** Summarize findings by root cause, credit what the docs already do well, and propose a specific fix for each gap.
 
+## Running and recording a session
+
+| | Claude Code (VS Code extension) | Codex CLI |
+| --- | --- | --- |
+| Check for standing instructions | `~/.claude/CLAUDE.md`, plus `/mcp` for connected servers | `~/.codex/AGENTS.md`, plus `/status` |
+| Settings used for a clean run | `autoMemoryEnabled: false` and `disableClaudeAiConnectors: true` in `~/.claude/settings.json` | `web_search = "disabled"`, `approval_policy = "on-request"`, and `apps = false` and `memories = false` under `[features]` in `~/.codex/config.toml` |
+| Record version and model | `/status` | `codex --version` and `/status` |
+| Save the conversation | `/export transcript.md` | `/export transcript.md` |
+| Watch progress | The **Output** panel, set to the Claude Code log, shows each step; `Ctrl+Alt+F` toggles hidden tool calls in the chat panel | Shown in the terminal as it runs |
+
+Restore your usual settings when the runs are finished. Before committing a transcript, remove any long passages of downloaded docs content, keeping the commands and the agent's messages.
+
 ## Known limitations
 
 - **Prior knowledge.** Models may already know a popular product from training data, so a run tests the docs plus that prior knowledge, not the docs alone. Requiring page citations reduces this effect but does not remove it.
