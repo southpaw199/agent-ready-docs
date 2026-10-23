@@ -37,4 +37,4 @@ Restore your usual settings when the runs are finished. Before committing a tran
 
 ---
 
-© 2026 Alan Sloan. This method is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/): you may share and adapt it, with credit to the author.
+© 2026 Alan Sloan. All rights reserved. You may read and link to this method; you may not copy, republish, or adapt it without permission. See [COPYRIGHT.md](../../COPYRIGHT.md).
