@@ -1,6 +1,6 @@
 # Agent task review
 
-**Author:** Alan Sloan · [LinkedIn](https://www.linkedin.com/in/alansloan) · [GitHub](https://github.com/southpaw199)
+**Author:** Alan Sloan · [linkedin.com/in/alansloan](https://www.linkedin.com/in/alansloan) · [github.com/southpaw199](https://github.com/southpaw199)
 
 **Question:** Can an AI coding agent complete real developer tasks using only a product's documentation, and where does it get stuck?
 
