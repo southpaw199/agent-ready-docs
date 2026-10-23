@@ -4,7 +4,11 @@ Methods and case studies for testing whether documentation works for AI agents a
 
 AI coding agents increasingly learn a product from its docs before a developer ever reads them. This repo asks a practical question: given only a product's documentation, can an agent complete real developer tasks, and where does it get stuck? Each finding traces a failure back to the docs (a missing prerequisite, an incomplete example, an unclear error) and proposes a fix.
 
-> **Status:** In progress. The first method and case study are under construction.
+## Case studies
+
+| Product | Method | Result |
+| --- | --- | --- |
+| [LanceDB](case-studies/lancedb/) | Agent task review, with Claude Code and Codex | Both agents passed 5 of 5 tasks; 4 main findings, led by deprecated APIs in the sync Python examples. [Report](case-studies/lancedb/reviews/agent-task-review/report.md) |
 
 ## How this repo is organized
 
