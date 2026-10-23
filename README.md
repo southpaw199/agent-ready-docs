@@ -32,4 +32,8 @@ AI coding assistants helped draft code and content in this repo. I ran, tested, 
 
 ## License
 
-Code is licensed under the [MIT License](LICENSE).
+Created by Alan Sloan ([LinkedIn](https://www.linkedin.com/in/alansloan)).
+
+- **Code** (Python files, notebooks, and workflows) is licensed under the [MIT License](LICENSE).
+- **Written content** (methods, reports, findings, and READMEs) is © 2026 Alan Sloan, licensed under [CC BY 4.0](LICENSE-CC-BY-4.0.md). You may share and adapt it, with credit to the author.
+- **Agent transcripts** in the `runs/` folders are records of each agent's output, included as evidence.
