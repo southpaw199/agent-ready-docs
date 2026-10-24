@@ -4,7 +4,7 @@
 
 **Question:** Can an AI coding agent complete real developer tasks using only a product's documentation, and where does it get stuck?
 
-**Version:** 0.1 (draft). Record the method version in each case study's report.
+**Version:** 0.2 (draft). Record the method version in each case study's report.
 
 ## Procedure
 
@@ -34,6 +34,11 @@ Restore your usual settings when the runs are finished. Before committing a tran
 - **Prior knowledge.** Models may already know a popular product from training data, so a run tests the docs plus that prior knowledge, not the docs alone. Requiring page citations reduces this effect but does not remove it.
 - **Non-determinism.** The same agent can behave differently on repeated runs. Record agent and model versions, and treat a single run as a signal, not a verdict.
 - **Product defects.** Some failures come from the product, not the docs. Log them under `product-defect` and keep them out of the docs findings.
+
+## Changelog
+
+- **0.2 (2026-10-23):** Added the `pass-with-issues` outcome to the [rubric](rubric.md), for runs that meet every success criterion but have unreported warnings, knowledge not from the docs, or citations that don't hold up. Reviews run under 0.1, such as LanceDB's, keep their published scores.
+- **0.1 (2026-10-21):** First version, used for the LanceDB review.
 
 ---
 
