@@ -4,7 +4,11 @@ Methods and case studies for testing whether documentation works for AI agents a
 
 AI coding agents increasingly learn a product from its docs before a developer ever reads them. This repo asks a practical question: given only a product's documentation, can an agent complete real developer tasks, and where does it get stuck? Each finding traces a failure back to the docs (a missing prerequisite, an incomplete example, an unclear error) and proposes a fix.
 
-> **Status:** In progress. The first method and case study are under construction.
+## Case studies
+
+| Product | Method | Result |
+| --- | --- | --- |
+| [LanceDB](case-studies/lancedb/) | Agent task review, with Claude Code and Codex | Both agents passed 5 of 5 tasks; 4 main findings, led by deprecated APIs in the sync Python examples. [Report](case-studies/lancedb/reviews/agent-task-review/report.md) |
 
 ## How this repo is organized
 
@@ -28,4 +32,8 @@ AI coding assistants helped draft code and content in this repo. I ran, tested, 
 
 ## License
 
-Code is licensed under the [MIT License](LICENSE).
+Created by Alan Sloan ([LinkedIn](https://www.linkedin.com/in/alansloan)).
+
+- **Code** (Python files, notebooks, and workflows) is licensed under the [MIT License](LICENSE).
+- **Written content** (methods, reports, findings, task definitions, and READMEs) is © 2026 Alan Sloan. All rights reserved: you may read and link to it, but not copy, republish, or adapt it without permission. See [COPYRIGHT.md](COPYRIGHT.md).
+- **Agent transcripts** in the `runs/` folders are records of each agent's output, included as evidence.

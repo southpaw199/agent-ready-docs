@@ -1,5 +1,7 @@
 # Agent task review
 
+**Author:** Alan Sloan · [linkedin.com/in/alansloan](https://www.linkedin.com/in/alansloan) · [github.com/southpaw199](https://github.com/southpaw199)
+
 **Question:** Can an AI coding agent complete real developer tasks using only a product's documentation, and where does it get stuck?
 
 **Version:** 0.1 (draft). Record the method version in each case study's report.
@@ -32,3 +34,7 @@ Restore your usual settings when the runs are finished. Before committing a tran
 - **Prior knowledge.** Models may already know a popular product from training data, so a run tests the docs plus that prior knowledge, not the docs alone. Requiring page citations reduces this effect but does not remove it.
 - **Non-determinism.** The same agent can behave differently on repeated runs. Record agent and model versions, and treat a single run as a signal, not a verdict.
 - **Product defects.** Some failures come from the product, not the docs. Log them under `product-defect` and keep them out of the docs findings.
+
+---
+
+© 2026 Alan Sloan. All rights reserved. You may read and link to this method; you may not copy, republish, or adapt it without permission. See [COPYRIGHT.md](../../COPYRIGHT.md).
