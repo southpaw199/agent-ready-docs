@@ -7,12 +7,13 @@ Use these values in the `outcome` and `root_cause` columns of the run log, so re
 | Value | Meaning |
 | --- | --- |
 | `pass` | The agent completed the task and the result met every success criterion, with no hints. |
-| `pass-with-hints` | The agent completed the task after one or more hints. Record the count in `hints_given`. |
+| `pass-with-issues` | The result met every success criterion with no hints, but the run had a problem the task's scoring names: for example, warnings the agent printed but didn't report, knowledge it used that wasn't from the docs, or a cited page that doesn't say what the agent claims. Describe each issue in `notes`. |
+| `pass-with-hints` | The agent completed the task after one or more hints. Record the count in `hints_given`. If the run also had issues, use this value and describe the issues in `notes`. |
 | `fail` | The agent could not complete the task, or its result did not meet the success criteria. |
 
 ## Root cause
 
-Record the main reason for each stall, hint, or failure. Leave it blank for a clean `pass`.
+Record the main reason for each stall, hint, failure, or issue. Leave it blank for a clean `pass`.
 
 | Value | The docs... |
 | --- | --- |
