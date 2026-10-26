@@ -9,6 +9,7 @@ AI coding agents increasingly learn a product from its docs before a developer e
 | Product | Method | Result |
 | --- | --- | --- |
 | [LanceDB](case-studies/lancedb/) | Agent task review, with Claude Code and Codex | Both agents passed 5 of 5 tasks; 4 main findings, led by deprecated APIs in the sync Python examples. [Report](case-studies/lancedb/reviews/agent-task-review/report.md) |
+| [NVIDIA OpenUSD](case-studies/nvidia/) | Agent task review, with Claude Code and Codex (Tier 1 of 3; Omniverse and Isaac Sim to come) | Both agents completed 5 of 5 OpenUSD tasks with no hints; 2 main findings, led by Python names missing from the C++-only API reference. [Report](case-studies/nvidia/reviews/agent-task-review/report.md) |
 
 ## How this repo is organized
 
