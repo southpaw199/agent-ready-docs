@@ -23,11 +23,12 @@
 | --- | --- | --- |
 | Check for standing instructions | `~/.claude/CLAUDE.md`, plus `/mcp` for connected servers | `~/.codex/AGENTS.md`, plus `/status` |
 | Settings used for a clean run | `autoMemoryEnabled: false` and `disableClaudeAiConnectors: true` in `~/.claude/settings.json` | `web_search = "disabled"`, `approval_policy = "on-request"`, and `apps = false` and `memories = false` under `[features]` in `~/.codex/config.toml` |
+| Start from a clean terminal | Run `deactivate`, or open a new terminal, before `code <run folder>`; the session inherits the terminal's environment, including any virtual environment left active by a rerun | Run `deactivate`, or open a new terminal, before starting `codex` in the run folder |
 | Record version and model | `/status` | `codex --version` and `/status` |
 | Save the conversation | `/export transcript.md` | `/export transcript.md` |
 | Watch progress | The **Output** panel, set to the Claude Code log, shows each step; `Ctrl+Alt+F` toggles hidden tool calls in the chat panel | Shown in the terminal as it runs |
 
-Restore your usual settings when the runs are finished. Before committing a transcript, remove any long passages of downloaded docs content, keeping the commands and the agent's messages.
+Restore your usual settings when the runs are finished. To check afterwards which Python a session started with, read `.venv/pyvenv.cfg` in the run folder: its `command` line shows the interpreter that created the agent's environment. Before committing a transcript, remove any long passages of downloaded docs content, keeping the commands and the agent's messages.
 
 ## Known limitations
 
@@ -37,7 +38,7 @@ Restore your usual settings when the runs are finished. Before committing a tran
 
 ## Changelog
 
-- **0.2 (2026-10-23):** Added the `pass-with-issues` outcome to the [rubric](rubric.md), for runs that meet every success criterion but have unreported warnings, knowledge not from the docs, or citations that don't hold up. Reviews run under 0.1, such as LanceDB's, keep their published scores.
+- **0.2 (2026-10-23):** Added the `pass-with-issues` outcome to the [rubric](rubric.md), for runs that meet every success criterion but have unreported warnings, knowledge not from the docs, or citations that don't hold up. Reviews run under 0.1, such as LanceDB's, keep their published scores. Updated 2026-10-25: added the "Start from a clean terminal" row, after three NVIDIA sessions inherited a reviewer's rerun environment. No change to scoring.
 - **0.1 (2026-10-21):** First version, used for the LanceDB review.
 
 ---
