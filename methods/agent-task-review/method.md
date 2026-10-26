@@ -4,13 +4,13 @@
 
 **Question:** Can an AI coding agent complete real developer tasks using only a product's documentation, and where does it get stuck?
 
-**Version:** 0.2 (draft). Record the method version in each case study's report.
+**Version:** 0.3 (draft). Record the method version in each case study's report.
 
 ## Procedure
 
 1. **Choose the tasks.** Pick four to six tasks a new developer would actually attempt, from first install to a production concern such as indexing or error handling. Write each one with [task-template.md](task-template.md).
 2. **Prepare a clean environment.** Start every attempt in a new, empty folder with a fresh virtual environment, so nothing from an earlier attempt helps.
-3. **Restrict the agent to the docs.** Point the agent at the product's documentation entry point (for example, its `llms.txt` file) and instruct it to use only pages from that site and to cite every page it relies on.
+3. **Restrict the agent to the docs.** Point the agent at the product's documentation entry point (for example, its `llms.txt` file) and instruct it to use only pages from that site and to cite every page it relies on. To test a documentation MCP server, run the same tasks again as a second condition, `docs+mcp`: register the server only in that run's folder, tell the agent it's available without telling it to use it, and ask it to name the tool and query behind each step that relies on an MCP result.
 4. **Run without help.** Give the agent the task and let it work. When it stalls, record what it was missing, then give the smallest hint that lets it continue, and record the hint.
 5. **Verify the result yourself.** Run the agent's code and check the output against the task's success criteria. An agent reporting success is not evidence of success.
 6. **Log every attempt.** Add one row per attempt to the case study's `run-log.csv`, using the columns in [run-log-template.csv](run-log-template.csv) and the categories in [rubric.md](rubric.md). Save transcripts and code in `runs/<date>-<agent>/`.
@@ -38,6 +38,7 @@ Restore your usual settings when the runs are finished. To check afterwards whic
 
 ## Changelog
 
+- **0.3 (2026-10-26):** Added the `docs+mcp` condition for testing a documentation MCP server: `condition` and `mcp_calls` columns in the [run log](run-log-template.csv), and MCP results counted as sources, checked like cited pages, so a wrong or outdated MCP result the agent relied on scores `pass-with-issues` (see the [rubric](rubric.md)). Docs-only runs scored under 0.2, such as NVIDIA's Tier 1, keep their scores and take `docs` in the new column.
 - **0.2 (2026-10-23):** Added the `pass-with-issues` outcome to the [rubric](rubric.md), for runs that meet every success criterion but have unreported warnings, knowledge not from the docs, or citations that don't hold up. Reviews run under 0.1, such as LanceDB's, keep their published scores. Updated 2026-10-25: added the "Start from a clean terminal" row, after three NVIDIA sessions inherited a reviewer's rerun environment. No change to scoring.
 - **0.1 (2026-10-21):** First version, used for the LanceDB review.
 
