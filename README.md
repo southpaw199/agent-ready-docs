@@ -2,9 +2,39 @@
 
 Methods and case studies for testing whether documentation works for AI agents as well as for people.
 
-AI coding agents increasingly learn a product from its docs before a developer ever reads them. This project asks a practical question: given only a product's documentation, can an agent complete real developer tasks, and where does it get stuck? Each finding traces a failure back to the docs (a missing prerequisite, an incomplete example, an unclear error) and proposes a fix.
+## Why this project exists
 
-This repo holds the methods. Each case study has its own repo.
+More and more developers meet a product through an AI coding agent: they ask Claude Code or Codex to set something up, and the agent reads the docs for them. When the docs leave out a prerequisite, show an example that doesn't run, or document an API in only one language, the agent either gets stuck or fills the gap from memory. The developer may never know which happened.
+
+Docs are usually reviewed by people reading them. This project tests them the way agents use them: it gives an agent a real developer task and only the docs, then checks what the agent produces and where it went beyond them.
+
+## How a review works
+
+The [agent task review](methods/agent-task-review/method.md) is the method behind each case study:
+
+1. **Choose real tasks.** Four to six tasks a new developer would attempt, from first install to a production concern.
+2. **Limit the agent to the docs.** Each attempt starts in a clean environment, and the agent must cite every page it relies on.
+3. **Verify independently.** The reviewer reruns the agent's code and checks the result against written success criteria. An agent saying it succeeded isn't evidence that it did.
+4. **Check the sources.** Cited pages must say what the agent claims, and anything it used that isn't in the docs is recorded.
+5. **Use two agents.** A gap that two different agents hit is stronger evidence than one.
+6. **Report by root cause.** Each finding is traced to a cause, such as a missing prerequisite, an incomplete example, or a page the agent couldn't find, and comes with a specific fix. The report also credits what the docs do well.
+
+Every run is scored on a shared [rubric](methods/agent-task-review/rubric.md): pass, pass with issues, pass with hints, or fail. The method can also compare the docs alone with the docs plus a documentation MCP server.
+
+## What each case study publishes
+
+Everything needed to check a finding: the tasks and success criteria, reference solutions and the checkers that score each run, every agent's code and transcript, a run log, a findings log with the evidence for each finding, and the report.
+
+## Who this is for
+
+- **Documentation and developer-experience teams** who want to know how their docs work for agents, and what to fix first.
+- **Anyone evaluating AI agents against docs**, who wants to see how such a review can be run and scored.
+
+## Status
+
+The method is at version 0.3, a draft that improves as each case study tests it. Each version is tagged, and its [changelog](methods/agent-task-review/method.md#changelog) says what changed. LanceDB is complete. NVIDIA is one tier into three: Tier 1, hands-on OpenUSD tasks, is done; Omniverse and Isaac Sim come next.
+
+Each case study has its own repo, listed below.
 
 ## Case studies
 
@@ -18,7 +48,6 @@ This repo holds the methods. Each case study has its own repo.
 | Folder | What it holds |
 | --- | --- |
 | [`methods/`](methods/) | Reusable evaluation methods. Each method defines its procedure, scoring rubric, and templates. |
-| [`tools/`](tools/) | Scripts shared across case studies. |
 
 A method's folder name is the same everywhere it appears: `methods/agent-task-review/` here defines the method, and `reviews/agent-task-review/` in a case study's repo applies it.
 
