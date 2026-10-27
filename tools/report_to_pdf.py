@@ -1,0 +1,264 @@
+#!/usr/bin/env python3
+"""Build a PDF of a case study's agent task review report.
+
+The PDF holds the report, then three appendices: the method and the rubric,
+as of the version the report used, and the case study's findings log, printed
+in landscape. Links between these parts become links within the PDF; links to
+files that aren't included point to GitHub.
+
+Usage:
+    python tools/report_to_pdf.py ~/projects/agent-ready-lancedb
+    python tools/report_to_pdf.py ~/projects/agent-ready-nvidia -o nvidia.pdf
+
+The PDF is printed with headless Chrome or Edge. In WSL, the Windows browser is
+used. See tools/README.md for setup.
+"""
+import argparse
+import html
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+from markdown_it import MarkdownIt
+from mdit_py_plugins.anchors import anchors_plugin
+
+METHOD_REPO = Path(__file__).resolve().parents[1]
+METHOD_DIR = "methods/agent-task-review"
+REVIEW_DIR = "reviews/agent-task-review"
+GITHUB = "https://github.com/southpaw199"
+METHOD_LINK = re.compile(
+    r"https://github\.com/southpaw199/agent-ready-docs/blob/(v[\d.]+)/methods/agent-task-review/(method|rubric)\.md(#[\w-]+)?$"
+)
+MD_LINK = re.compile(r"\]\(([^)\s]+)\)")
+BROWSERS = [
+    "/mnt/c/Program Files/Google/Chrome/Application/chrome.exe",
+    "/mnt/c/Program Files (x86)/Google/Chrome/Application/chrome.exe",
+    "/mnt/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
+    "google-chrome",
+    "chromium",
+    "chromium-browser",
+]
+
+CSS = """
+@page { size: letter; margin: 0.75in 0.75in 0.85in;
+  @bottom-center { content: counter(page) " of " counter(pages); font: 8.5pt "Segoe UI", Arial, sans-serif; color: #666; } }
+@page landscape { size: letter landscape; margin: 0.6in 0.6in 0.75in; }
+body { font-family: "Segoe UI", Arial, sans-serif; font-size: 10pt; line-height: 1.45; color: #1f2328; }
+h1 { font-size: 20pt; margin: 0 0 0.4em; }
+h2 { font-size: 14pt; border-bottom: 1px solid #d0d7de; padding-bottom: 0.2em; margin-top: 1.6em; }
+h3 { font-size: 11.5pt; margin-top: 1.3em; }
+h4 { font-size: 10.5pt; }
+h2, h3, h4 { break-after: avoid; }
+table { border-collapse: collapse; width: 100%; margin: 0.6em 0 1em; font-size: 8.8pt; break-inside: avoid; }
+th, td { border: 1px solid #d0d7de; padding: 4px 6px; vertical-align: top; text-align: left; overflow-wrap: break-word; }
+td:first-child { white-space: nowrap; }
+th { background: #f6f8fa; }
+thead { display: table-header-group; }
+tr { break-inside: avoid; }
+code { font-family: Consolas, "Courier New", monospace; font-size: 0.92em; background: #f6f8fa; padding: 0 0.2em; border-radius: 3px; }
+pre { background: #f6f8fa; padding: 0.6em; font-size: 8.5pt; white-space: pre-wrap; break-inside: avoid; }
+pre code { background: none; padding: 0; }
+a { color: #0969da; text-decoration: none; }
+hr { border: 0; border-top: 1px solid #d0d7de; }
+.appendix { break-before: page; }
+.landscape { page: landscape; }
+.landscape table { font-size: 8pt; break-inside: auto; }
+.landscape tr { break-inside: auto; }
+.note { color: #57606a; font-style: italic; }
+"""
+
+
+def git_show(ref, path):
+    return subprocess.run(["git", "-C", str(METHOD_REPO), "show", f"{ref}:{path}"],
+                          capture_output=True, text=True, check=True).stdout
+
+
+def method_tags():
+    out = subprocess.run(["git", "-C", str(METHOD_REPO), "tag", "--list", "v*"],
+                         capture_output=True, text=True, check=True).stdout.split()
+    return sorted(out, key=version_key)
+
+
+def version_key(tag):
+    return tuple(int(n) for n in tag.lstrip("v").split("."))
+
+
+def repo_name(repo):
+    url = subprocess.run(["git", "-C", str(repo), "remote", "get-url", "origin"],
+                         capture_output=True, text=True).stdout.strip()
+    m = re.search(r"github\.com[/:]southpaw199/([\w.-]+?)(?:\.git)?$", url)
+    return m.group(1) if m else repo.name
+
+
+def section(text, heading):
+    """Return the "## heading" section of a Markdown file, up to the next ## heading."""
+    m = re.search(rf"^## {re.escape(heading)}\n.*?(?=^## |\Z)", text, re.S | re.M)
+    return m.group(0).rstrip() + "\n" if m else None
+
+
+def drop_title(text):
+    """Remove a file's own # title, since the appendix supplies its own."""
+    return re.sub(r"\A# .*\n+", "", text)
+
+
+class Linker:
+    """Rewrites a part's Markdown links for the combined PDF."""
+
+    def __init__(self, case_repo, case_name, method_tag):
+        self.case_repo = case_repo
+        self.case_name = case_name
+        self.method_tag = method_tag
+
+    def rewrite(self, text, part, repo, file_dir):
+        """part: anchor prefix for this part ("" for the report); repo: "case" or "method";
+        file_dir: the file's folder, relative to its repo root."""
+        def fix(m):
+            return "](" + self.target(m.group(1), part, repo, file_dir) + ")"
+        return MD_LINK.sub(fix, text)
+
+    def target(self, url, part, repo, file_dir):
+        m = METHOD_LINK.match(url)
+        if m:
+            return self.anchor(m.group(2), m.group(3))
+        if "://" in url or url.startswith("mailto:"):
+            return url
+        if url.startswith("#"):
+            return self.anchor(part, url)
+        path, _, frag = url.partition("#")
+        frag = "#" + frag if frag else None
+        resolved = os.path.normpath(os.path.join(file_dir, path))
+        if repo == "case":
+            if resolved == f"{REVIEW_DIR}/report.md":
+                return self.anchor("", frag) if frag else "#top"
+            if resolved == f"{REVIEW_DIR}/findings.md":
+                return self.anchor("findings", frag)
+            return f"{GITHUB}/{self.case_name}/blob/main/{resolved}" + (frag or "")
+        if resolved in (f"{METHOD_DIR}/method.md", f"{METHOD_DIR}/rubric.md"):
+            return self.anchor(Path(resolved).stem, frag)
+        return f"{GITHUB}/agent-ready-docs/blob/{self.method_tag}/{resolved}" + (frag or "")
+
+    @staticmethod
+    def anchor(part, frag):
+        if not frag:
+            return f"#{part}"
+        return f"#{part}-{frag[1:]}" if part else frag
+
+
+def render(md, text, prefix):
+    out = md.render(text)
+    if prefix:
+        out = re.sub(r'(<h[1-6] id=")', rf"\1{prefix}-", out)
+    return out
+
+
+def find_browser(arg):
+    for candidate in ([arg] if arg else BROWSERS):
+        path = shutil.which(candidate) or (candidate if Path(candidate).exists() else None)
+        if path:
+            return path
+    sys.exit("No Chrome or Edge found; pass its path with --browser.")
+
+
+def print_pdf(browser, html_file, pdf_file):
+    windows = browser.startswith("/mnt/")
+    to_arg = (lambda p: subprocess.run(["wslpath", "-w", str(p)], capture_output=True,
+                                       text=True, check=True).stdout.strip()) if windows else str
+    profile = tempfile.mkdtemp(dir=html_file.parent)
+    cmd = [browser, "--headless=new", "--disable-gpu", "--no-first-run", "--no-pdf-header-footer",
+           f"--user-data-dir={to_arg(profile)}", f"--print-to-pdf={to_arg(pdf_file)}", to_arg(html_file)]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+    if not pdf_file.exists():
+        sys.exit(f"The browser didn't write a PDF.\n{result.stderr[-2000:]}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("case_study", type=Path, help="the case study repo, for example ~/projects/agent-ready-lancedb")
+    parser.add_argument("-o", "--output", type=Path, help="the PDF to write (default: <repo>-report.pdf here)")
+    parser.add_argument("--browser", help="path to Chrome or Edge, if it isn't found automatically")
+    parser.add_argument("--html", action="store_true", help="also keep the HTML, to check the layout in a browser")
+    args = parser.parse_args()
+
+    case_repo = args.case_study.expanduser().resolve()
+    report_path = case_repo / REVIEW_DIR / "report.md"
+    findings_path = case_repo / REVIEW_DIR / "findings.md"
+    if not report_path.exists():
+        sys.exit(f"No report at {report_path}")
+    case_name = repo_name(case_repo)
+    report = report_path.read_text(encoding="utf-8")
+    findings = findings_path.read_text(encoding="utf-8")
+
+    # The method version: the latest one the report links to.
+    used = sorted({m.group(1) for url in MD_LINK.findall(report)
+                   if (m := METHOD_LINK.match(url)) and m.group(2) == "method"}, key=version_key)
+    if not used:
+        sys.exit("The report doesn't link to a tagged method version.")
+    tag = used[-1]
+    version = tag.lstrip("v")
+    method = git_show(tag, f"{METHOD_DIR}/method.md")
+    rubric = git_show(tag, f"{METHOD_DIR}/rubric.md")
+
+    if len(used) == 1:
+        method_note = f"This appendix reproduces the agent task review method as of version {version}, the version this review used."
+    else:
+        earlier = ", ".join(t.lstrip("v") for t in used[:-1])
+        method_note = (f"This review used method versions {earlier} and {version}. This appendix reproduces "
+                       f"version {version}, the later of them; its changelog lists what changed.")
+    method_note += f" The source is the [{tag} tag]({GITHUB}/agent-ready-docs/tree/{tag}/{METHOD_DIR}) in agent-ready-docs."
+    rubric_note = f"This appendix reproduces the rubric as of method version {version}."
+
+    # Severity: the rubric didn't define it before 0.4, though both reports rate findings by it.
+    if "| Severity |" in report and section(rubric, "Severity") is None:
+        source = next(t for t in method_tags() if section(git_show(t, f"{METHOD_DIR}/rubric.md"), "Severity"))
+        severity = section(git_show(source, f"{METHOD_DIR}/rubric.md"), "Severity")
+        rubric = rubric.rstrip() + "\n\n" + severity
+        rubric_note += (f" Version {version} didn't define severity; the scale was added in version "
+                        f"{source.lstrip('v')}, so its Severity section, reproduced from that version, closes this "
+                        f"appendix. The report's Main findings section defines the same scale.")
+
+    linker = Linker(case_repo, case_name, tag)
+    md = MarkdownIt("commonmark").enable("table").use(anchors_plugin, min_level=1, max_level=6)
+
+    title = re.match(r"# (.*)", report).group(1)
+    report_md = linker.rewrite(report, "", "case", REVIEW_DIR)
+    parts = [
+        f'<section id="top">{render(md, report_md, "")}</section>',
+        '<section id="method" class="appendix">'
+        + render(md, f"# Appendix A. Agent task review method, version {version}\n\n*{method_note}*\n\n"
+                 + drop_title(linker.rewrite(method, "method", "method", METHOD_DIR)), "method")
+        + "</section>",
+        '<section id="rubric" class="appendix">'
+        + render(md, f"# Appendix B. Rubric, version {version}\n\n*{rubric_note}*\n\n"
+                 + drop_title(linker.rewrite(rubric, "rubric", "method", METHOD_DIR)), "rubric")
+        + "</section>",
+        '<section id="findings" class="appendix landscape">'
+        + render(md, "# Appendix C. Findings log\n\n*This appendix reproduces the case study's findings log, "
+                 "the evidence behind each finding in the report.*\n\n"
+                 + drop_title(linker.rewrite(findings, "findings", "case", REVIEW_DIR)), "findings")
+        + "</section>",
+    ]
+    page = (f'<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>{html.escape(title)}</title>'
+            f"<style>{CSS}</style></head><body>\n" + "\n".join(parts) + "\n</body></html>\n")
+
+    output = (args.output or Path.cwd() / f"{case_name}-report.pdf").expanduser().resolve()
+    work = Path(tempfile.mkdtemp(prefix="report-pdf-"))
+    try:
+        html_file = work / "report.html"
+        html_file.write_text(page, encoding="utf-8")
+        pdf_file = work / "report.pdf"
+        print_pdf(find_browser(args.browser), html_file, pdf_file)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(pdf_file), output)
+        if args.html:
+            shutil.copy(html_file, output.with_suffix(".html"))
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+    print(f"Wrote {output}")
+
+
+if __name__ == "__main__":
+    main()
