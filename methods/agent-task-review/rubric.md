@@ -25,3 +25,15 @@ Record the main reason for each stall, hint, failure, or issue. Leave it blank f
 | `outdated-content` | Described an API or behavior that no longer matches the product. |
 | `product-defect` | Weren't the cause: the product itself misbehaved. Report separately from docs findings. |
 | `other` | None of the above. Explain in `notes`. |
+
+## Severity
+
+Rate each finding in the report and the findings log. Outcome scores a run; severity rates a finding.
+
+| Value | Meaning |
+| --- | --- |
+| **High** | An agent following the docs would fail the task or get a wrong result. |
+| **Medium** | The task succeeds, but only with knowledge the docs don't give or by a route they don't point to. |
+| **Low** | Friction or polish. |
+
+Rate by what an agent following the docs would run into, not by how often it happened. Say how often separately, for example "Medium. Seen with both agents."

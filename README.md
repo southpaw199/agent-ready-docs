@@ -19,7 +19,7 @@ The [agent task review](methods/agent-task-review/method.md) is the method behin
 5. **Use two agents.** A gap that two different agents hit is stronger evidence than one.
 6. **Report by root cause.** Each finding is traced to a cause, such as a missing prerequisite, an incomplete example, or a page the agent couldn't find, and comes with a specific fix. The report also credits what the docs do well.
 
-Every run is scored on a shared [rubric](methods/agent-task-review/rubric.md): pass, pass with issues, pass with hints, or fail. The method can also compare the docs alone with the docs plus a documentation MCP server.
+Every run is scored on a shared [rubric](methods/agent-task-review/rubric.md): pass, pass with issues, pass with hints, or fail. Every finding is rated High, Medium, or Low severity. The method can also compare the docs alone with the docs plus a documentation MCP server.
 
 ## What each case study publishes
 
@@ -32,7 +32,7 @@ Everything needed to check a finding: the tasks and success criteria, reference 
 
 ## Status
 
-The method is at version 0.3, a draft that improves as each case study tests it. Each version is tagged, and its [changelog](methods/agent-task-review/method.md#changelog) says what changed. LanceDB is complete. NVIDIA is one tier into three: Tier 1, hands-on OpenUSD tasks, is done; Omniverse and Isaac Sim come next.
+The method is at version 0.4, a draft that improves as each case study tests it. Each version is tagged, and its [changelog](methods/agent-task-review/method.md#changelog) says what changed. LanceDB is complete. NVIDIA is one tier into three: Tier 1, hands-on OpenUSD tasks, is done; Omniverse and Isaac Sim come next.
 
 Each case study has its own repo, listed below.
 

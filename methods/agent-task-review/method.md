@@ -4,7 +4,7 @@
 
 **Question:** Can an AI coding agent complete real developer tasks using only a product's documentation, and where does it get stuck?
 
-**Version:** 0.3 (draft). Record the method version in each case study's report.
+**Version:** 0.4 (draft). Record the method version in each case study's report.
 
 ## Procedure
 
@@ -15,7 +15,7 @@
 5. **Verify the result yourself.** Run the agent's code and check the output against the task's success criteria. An agent reporting success is not evidence of success.
 6. **Log every attempt.** Add one row per attempt to the case study's `run-log.csv`, using the columns in [run-log-template.csv](run-log-template.csv) and the categories in [rubric.md](rubric.md). Save transcripts and code in `runs/<date>-<agent>/`.
 7. **Repeat with a second agent** where possible. A failure that two different agents share is stronger evidence of a docs gap than a failure in one.
-8. **Report.** Summarize findings by root cause, credit what the docs already do well, and propose a specific fix for each gap.
+8. **Report.** Summarize findings by root cause, rate each one's severity using the [rubric](rubric.md#severity), credit what the docs already do well, and propose a specific fix for each gap.
 
 ## Running and recording a session
 
@@ -38,6 +38,7 @@ Restore your usual settings when the runs are finished. To check afterwards whic
 
 ## Changelog
 
+- **0.4 (2026-10-27):** Added a severity scale for findings (High, Medium, Low) to the [rubric](rubric.md#severity), first used in NVIDIA's Tier 1 report. Outcomes and root causes are unchanged. LanceDB's findings, reviewed under 0.1, were rated on this scale afterwards.
 - **0.3 (2026-10-26):** Added the `docs+mcp` condition for testing a documentation MCP server: `condition` and `mcp_calls` columns in the [run log](run-log-template.csv), and MCP results counted as sources, checked like cited pages, so a wrong or outdated MCP result the agent relied on scores `pass-with-issues` (see the [rubric](rubric.md)). Docs-only runs scored under 0.2, such as NVIDIA's Tier 1, keep their scores and take `docs` in the new column.
 - **0.2 (2026-10-23):** Added the `pass-with-issues` outcome to the [rubric](rubric.md), for runs that meet every success criterion but have unreported warnings, knowledge not from the docs, or citations that don't hold up. Reviews run under 0.1, such as LanceDB's, keep their published scores. Updated 2026-10-25: added the "Start from a clean terminal" row, after three NVIDIA sessions inherited a reviewer's rerun environment. No change to scoring.
 - **0.1 (2026-10-21):** First version, used for the LanceDB review.
