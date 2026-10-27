@@ -23,8 +23,11 @@ import sys
 import tempfile
 from pathlib import Path
 
+import pypdfium2 as pdfium
 from markdown_it import MarkdownIt
 from mdit_py_plugins.anchors import anchors_plugin
+from pypdf import PdfReader, PdfWriter
+from pypdf.annotations import Link
 
 METHOD_REPO = Path(__file__).resolve().parents[1]
 METHOD_DIR = "methods/agent-task-review"
@@ -34,6 +37,8 @@ METHOD_LINK = re.compile(
     r"https://github\.com/southpaw199/agent-ready-docs/blob/(v[\d.]+)/methods/agent-task-review/(method|rubric)\.md(#[\w-]+)?$"
 )
 MD_LINK = re.compile(r"\]\(([^)\s]+)\)")
+AUTHOR_LINE = re.compile(r"^\*\*Author:\*\* (.+?) · \[[^\]]*\]\((https://www\.linkedin\.com/[^)]+)\)", re.M)
+FOOTER_TOP = 45  # points from the bottom edge; footer text sits below this, body text above
 BROWSERS = [
     "/mnt/c/Program Files/Google/Chrome/Application/chrome.exe",
     "/mnt/c/Program Files (x86)/Google/Chrome/Application/chrome.exe",
@@ -43,10 +48,16 @@ BROWSERS = [
     "chromium-browser",
 ]
 
-CSS = """
+PAGE_CSS = """
 @page { size: letter; margin: 0.75in 0.75in 0.85in;
-  @bottom-center { content: counter(page) " of " counter(pages); font: 8.5pt "Segoe UI", Arial, sans-serif; color: #666; } }
+  @top-right { content: "{title}"; font: italic 8.5pt "Segoe UI", Arial, sans-serif; color: #666; }
+  @bottom-left { content: "{footer}"; font: 8.5pt "Segoe UI", Arial, sans-serif; color: #666; }
+  @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 8.5pt "Segoe UI", Arial, sans-serif; color: #666; } }
+@page :first { @top-right { content: none; } }
 @page landscape { size: letter landscape; margin: 0.6in 0.6in 0.75in; }
+"""
+
+CSS = """
 body { font-family: "Segoe UI", Arial, sans-serif; font-size: 10pt; line-height: 1.45; color: #1f2328; }
 h1 { font-size: 20pt; margin: 0 0 0.4em; }
 h2 { font-size: 14pt; border-bottom: 1px solid #d0d7de; padding-bottom: 0.2em; margin-top: 1.6em; }
@@ -67,7 +78,6 @@ hr { border: 0; border-top: 1px solid #d0d7de; }
 .appendix { break-before: page; }
 .landscape { page: landscape; }
 .landscape table { font-size: 8pt; break-inside: auto; }
-.landscape tr { break-inside: auto; }
 .note { color: #57606a; font-style: italic; }
 """
 
@@ -153,6 +163,36 @@ def render(md, text, prefix):
     if prefix:
         out = re.sub(r'(<h[1-6] id=")', rf"\1{prefix}-", out)
     return out
+
+
+def css_string(text):
+    return text.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def link_footer(pdf_file, links):
+    """Add clickable links over footer text. Chrome prints page margins as plain
+    text, so links there have to be added to the PDF afterwards.
+
+    links: (text, url) pairs; each match of text in a page's footer gets a link."""
+    found = []
+    doc = pdfium.PdfDocument(str(pdf_file))
+    for i in range(len(doc)):
+        textpage = doc[i].get_textpage()
+        for text, url in links:
+            searcher = textpage.search(text, match_case=True)
+            while hit := searcher.get_next():
+                boxes = [textpage.get_charbox(j) for j in range(hit[0], hit[0] + hit[1])]
+                rect = (min(b[0] for b in boxes), min(b[1] for b in boxes),
+                        max(b[2] for b in boxes), max(b[3] for b in boxes))
+                if rect[3] < FOOTER_TOP:
+                    found.append((i, rect, url))
+    doc.close()
+    writer = PdfWriter(clone_from=PdfReader(str(pdf_file)))
+    for i, rect, url in found:
+        writer.add_annotation(page_number=i, annotation=Link(rect=rect, url=url))
+    with open(pdf_file, "wb") as f:
+        writer.write(f)
+    return len(found)
 
 
 def find_browser(arg):
@@ -241,8 +281,18 @@ def main():
                  + drop_title(linker.rewrite(findings, "findings", "case", REVIEW_DIR)), "findings")
         + "</section>",
     ]
+    # Header and footer: the title on every page but the first; the author and repo on every page.
+    author = AUTHOR_LINE.search(report)
+    if not author:
+        sys.exit("The report has no **Author:** line with a LinkedIn link, which the footer needs.")
+    author_name, linkedin = author.groups()
+    repo_text = f"github.com/southpaw199/{case_name}"
+    footer = f"Author: {author_name} · {repo_text}"
+    page_css = PAGE_CSS.replace("{title}", css_string(title)).replace("{footer}", css_string(footer))
+    footer_links = [(author_name, linkedin), (repo_text, f"https://{repo_text}")]
+
     page = (f'<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>{html.escape(title)}</title>'
-            f"<style>{CSS}</style></head><body>\n" + "\n".join(parts) + "\n</body></html>\n")
+            f"<style>{page_css}{CSS}</style></head><body>\n" + "\n".join(parts) + "\n</body></html>\n")
 
     output = (args.output or Path.cwd() / f"{case_name}-report.pdf").expanduser().resolve()
     work = Path(tempfile.mkdtemp(prefix="report-pdf-"))
@@ -251,6 +301,9 @@ def main():
         html_file.write_text(page, encoding="utf-8")
         pdf_file = work / "report.pdf"
         print_pdf(find_browser(args.browser), html_file, pdf_file)
+        pages = len(PdfReader(str(pdf_file)).pages)
+        if link_footer(pdf_file, footer_links) != 2 * pages:
+            sys.exit("Couldn't find the author and repo in every page's footer, so the footer links are incomplete.")
         output.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(pdf_file), output)
         if args.html:
