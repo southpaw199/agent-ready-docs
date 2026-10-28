@@ -17,7 +17,9 @@ The PDF is meant to stand on its own, for example to share with someone who won'
 
 Links between these parts jump within the PDF, including links to the parts of the task file that Appendix C reproduces. Links to files that aren't included, such as the run log or transcripts, or to the rest of the task file, point to GitHub.
 
-Every page after the first has the report's title in italics at the top right. Every page's footer has the author, linked to their LinkedIn profile, and the case study's repo, linked to GitHub, on the left, and "Page X of Y" on the right. The author's name and LinkedIn link come from the report's `**Author:**` line, so the script stops if that line is missing. Browsers can't number a table of contents, so the script prints the PDF twice: once to find the page each section starts on, and again with those page numbers filled in. Table rows never break across pages; a row that doesn't fit moves to the next page. The page size is US Letter.
+Every page after the first has the report's title in italics at the top right. Every page's footer has the author, linked to their LinkedIn profile, and the case study's repo, linked to GitHub, on the left, and "Page X of Y" on the right. The author's name and LinkedIn link come from the report's `**Author:**` line, so the script stops if that line is missing. Browsers can't number a table of contents, so the script prints the PDF twice: once to find the page each section starts on, and again with those page numbers filled in.
+
+The PDF has bookmarks for every heading, nested as in the document, and opens with them showing. Its document properties give the report's title, the author, a subject, keywords, and the copyright notice. The notice is the "Copyright ©" line from the case study's `COPYRIGHT.md`, so the script stops if that file or line is missing. It's stored where Acrobat shows it under Copyright Status, linked to that file on GitHub. Table rows never break across pages; a row that doesn't fit moves to the next page. The page size is US Letter.
 
 ### Set up
 

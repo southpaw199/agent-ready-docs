@@ -28,6 +28,7 @@ from markdown_it import MarkdownIt
 from mdit_py_plugins.anchors import anchors_plugin
 from pypdf import PdfReader, PdfWriter
 from pypdf.annotations import Link
+from pypdf.generic import BooleanObject, DictionaryObject, NameObject, StreamObject
 
 METHOD_REPO = Path(__file__).resolve().parents[1]
 METHOD_DIR = "methods/agent-task-review"
@@ -82,13 +83,32 @@ blockquote { margin: 0.6em 0 1em; padding: 0 1em; border-left: 3px solid #d0d7de
 .landscape { page: landscape; }
 .landscape table { font-size: 8pt; break-inside: auto; }
 .note { color: #57606a; font-style: italic; }
+.toc-title { font-size: 14pt; font-weight: bold; border-bottom: 1px solid #d0d7de; padding-bottom: 0.2em; margin: 1.6em 0 0; }
 .toc ul { list-style: none; padding: 0; margin: 0.5em 0 0; }
 .toc li { margin: 0.2em 0; }
 .toc li.gap { margin-top: 0.7em; }
 .toc a { display: flex; color: inherit; }
-.toc .leader { flex: 1; border-bottom: 1px dotted #8c959f; margin: 0 0.4em 0.35em; }
-"""
-PROMPTS_POINTER = "[Appendix C](#prompts) gives each task's full prompt, word for word, as the agents received it."
+.toc .leader { flex: 1; overflow: hidden; white-space: nowrap; margin: 0 0.4em; color: #8c959f; }
+.toc .leader::after { content: "LEADER"; }
+""".replace("LEADER", " ." * 200)  # periods print as dots; a dotted border can print as dashes
+COPYRIGHT_LINE = re.compile(r"^Copyright © .+$", re.M)
+XMP = """<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/"
+    xmlns:pdf="http://ns.adobe.com/pdf/1.3/" xmlns:xmpRights="http://ns.adobe.com/xap/1.0/rights/">
+   <dc:title><rdf:Alt><rdf:li xml:lang="x-default">{title}</rdf:li></rdf:Alt></dc:title>
+   <dc:creator><rdf:Seq><rdf:li>{author}</rdf:li></rdf:Seq></dc:creator>
+   <dc:description><rdf:Alt><rdf:li xml:lang="x-default">{subject}</rdf:li></rdf:Alt></dc:description>
+   <dc:rights><rdf:Alt><rdf:li xml:lang="x-default">{copyright}</rdf:li></rdf:Alt></dc:rights>
+   <pdf:Keywords>{keywords}</pdf:Keywords>
+   <xmpRights:Marked>True</xmpRights:Marked>
+   <xmpRights:WebStatement>{url}</xmpRights:WebStatement>
+  </rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>"""
+PROMPTS_POINTER ="[Appendix C](#prompts) gives each task's full prompt, word for word, as the agents received it."
 
 
 def git_show(ref, path):
@@ -206,7 +226,8 @@ def contents(entries, pages):
     items = "".join(f'<li class="{"gap" if gap else ""}"><a href="#{id_}"><span>{title}</span>'
                     f'<span class="leader"></span><span>{pages.get(id_, "")}</span></a></li>'
                     for id_, title, gap in entries)
-    return f'<nav class="toc"><h2>Contents</h2><ul>{items}</ul></nav>\n'
+    # Not an <h2>, so the contents don't get a bookmark of their own.
+    return f'<nav class="toc"><p class="toc-title">Contents</p><ul>{items}</ul></nav>\n'
 
 
 def page_numbers(pdf_file):
@@ -253,6 +274,26 @@ def link_footer(pdf_file, links):
     return len(found)
 
 
+def add_metadata(pdf_file, title, author, subject, keywords, copyright, copyright_url):
+    """Set the document properties, in both the PDF's info dictionary and its XMP metadata,
+    which is where viewers such as Acrobat look for the copyright. Also open the PDF with
+    the bookmarks showing and its title, not its file name, in the window."""
+    writer = PdfWriter(clone_from=PdfReader(str(pdf_file)))
+    writer.add_metadata({"/Title": title, "/Author": author, "/Subject": subject, "/Keywords": keywords,
+                         "/Copyright": copyright, "/Creator": "report_to_pdf.py, agent-ready-docs"})
+    esc = lambda s: html.escape(s, quote=False)
+    xmp = StreamObject()
+    xmp.set_data(XMP.format(title=esc(title), author=esc(author), subject=esc(subject), keywords=esc(keywords),
+                            copyright=esc(copyright), url=esc(copyright_url)).encode("utf-8"))
+    xmp.update({NameObject("/Type"): NameObject("/Metadata"), NameObject("/Subtype"): NameObject("/XML")})
+    root = writer._root_object
+    root[NameObject("/Metadata")] = writer._add_object(xmp)
+    root[NameObject("/PageMode")] = NameObject("/UseOutlines")
+    root[NameObject("/ViewerPreferences")] = DictionaryObject({NameObject("/DisplayDocTitle"): BooleanObject(True)})
+    with open(pdf_file, "wb") as f:
+        writer.write(f)
+
+
 def find_browser(arg):
     for candidate in ([arg] if arg else BROWSERS):
         path = shutil.which(candidate) or (candidate if Path(candidate).exists() else None)
@@ -267,6 +308,7 @@ def print_pdf(browser, html_file, pdf_file):
                                        text=True, check=True).stdout.strip()) if windows else str
     profile = tempfile.mkdtemp(dir=html_file.parent)
     cmd = [browser, "--headless=new", "--disable-gpu", "--no-first-run", "--no-pdf-header-footer",
+           "--generate-pdf-document-outline",  # bookmarks, from the headings
            f"--user-data-dir={to_arg(profile)}", f"--print-to-pdf={to_arg(pdf_file)}", to_arg(html_file)]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
     if not pdf_file.exists():
@@ -361,6 +403,10 @@ def main():
     footer = f"Author: {author_name} · {repo_text}"
     page_css = PAGE_CSS.replace("{title}", css_string(title)).replace("{footer}", css_string(footer))
     footer_links = [(author_name, linkedin), (repo_text, f"https://{repo_text}")]
+    copyright_file = case_repo / "COPYRIGHT.md"
+    copyright = COPYRIGHT_LINE.search(copyright_file.read_text(encoding="utf-8")) if copyright_file.exists() else None
+    if not copyright:
+        sys.exit(f"No \"Copyright © ...\" line in {copyright_file}, which the PDF's metadata needs.")
 
     # Table of contents, below the title and author line: the report's ## sections, then the appendices.
     entries = [(id_, title_, False) for id_, title_ in re.findall(r'<h2 id="([^"]+)">(.*?)</h2>', report_html)]
@@ -397,6 +443,10 @@ def main():
         pages = len(PdfReader(str(pdf_file)).pages)
         if link_footer(pdf_file, footer_links) != 2 * pages:
             sys.exit("Couldn't find the author and repo in every page's footer, so the footer links are incomplete.")
+        add_metadata(pdf_file, title, author_name,
+                     "An agent task review report, with the method, rubric, task prompts, and findings log as appendices.",
+                     "AI coding agents, documentation, agent task review, agent-ready-docs",
+                     copyright.group(0), f"{GITHUB}/{case_name}/blob/main/COPYRIGHT.md")
         output.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(pdf_file), output)
         if args.html:
