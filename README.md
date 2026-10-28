@@ -32,7 +32,7 @@ Everything needed to check a finding: the tasks and success criteria, reference 
 
 ## Status
 
-The method is at version 0.4, a draft that improves as each case study tests it. Each version is tagged, and its [changelog](methods/agent-task-review/method.md#changelog) says what changed. LanceDB is complete. NVIDIA is one tier into three: Tier 1, hands-on OpenUSD tasks, is done; Omniverse and Isaac Sim come next.
+The method is at version 0.4, a draft that improves as each case study tests it. Each version is tagged, and its [changelog](methods/agent-task-review/method.md#changelog) says what changed. LanceDB is complete. NVIDIA's Tier 1, hands-on OpenUSD tasks, is complete; two further tiers, on Omniverse and Isaac Sim, are possible future projects.
 
 Each case study has its own repo, listed below.
 
@@ -41,7 +41,7 @@ Each case study has its own repo, listed below.
 | Product | Method | Result |
 | --- | --- | --- |
 | [LanceDB](https://github.com/southpaw199/agent-ready-lancedb) | Agent task review, with Claude Code and Codex | Both agents passed 5 of 5 tasks; 4 main findings, led by deprecated APIs in the sync Python examples. [Report](https://github.com/southpaw199/agent-ready-lancedb/blob/main/reviews/agent-task-review/report.md) |
-| [NVIDIA OpenUSD](https://github.com/southpaw199/agent-ready-nvidia) | Agent task review, with Claude Code and Codex (Tier 1 of 3; Omniverse and Isaac Sim to come) | Both agents completed 5 of 5 OpenUSD tasks with no hints; 2 main findings, led by Python names missing from the C++-only API reference. [Report](https://github.com/southpaw199/agent-ready-nvidia/blob/main/reviews/agent-task-review/report.md) |
+| [NVIDIA OpenUSD](https://github.com/southpaw199/agent-ready-nvidia) | Agent task review, with Claude Code and Codex (Tier 1, OpenUSD; Omniverse and Isaac Sim are possible future tiers) | Both agents completed 5 of 5 OpenUSD tasks with no hints; 2 main findings, led by Python names missing from the C++-only API reference. [Report](https://github.com/southpaw199/agent-ready-nvidia/blob/main/reviews/agent-task-review/report.md) |
 
 ## How this repo is organized
 
