@@ -67,6 +67,8 @@ h2, h3, h4 { break-after: avoid; }
 table { border-collapse: collapse; width: 100%; margin: 0.6em 0 1em; font-size: 8.8pt; break-inside: avoid; }
 th, td { border: 1px solid #d0d7de; padding: 4px 6px; vertical-align: top; text-align: left; overflow-wrap: break-word; }
 td:first-child { white-space: nowrap; }
+td ul { margin: 0; padding-left: 1.2em; }
+td li + li, td ul ul { margin-top: 0.3em; }
 th { background: #f6f8fa; }
 thead { display: table-header-group; }
 tr { break-inside: avoid; }
