@@ -48,7 +48,7 @@ Each case study has its own repo, listed below.
 | Folder | What it holds |
 | --- | --- |
 | [`methods/`](methods/) | Reusable evaluation methods. Each method defines its procedure, scoring rubric, and templates. |
-| [`tools/`](tools/) | Scripts shared across case studies, such as [`report_to_pdf.py`](tools/report_to_pdf.py), which builds a PDF of a case study's report with the method, rubric, and findings log as appendices. |
+| [`tools/`](tools/) | Scripts shared across case studies, such as [`report_to_pdf.py`](tools/report_to_pdf.py), which builds a PDF of a case study's report with the method, rubric, task prompts, and findings log as appendices. |
 
 A method's folder name is the same everywhere it appears: `methods/agent-task-review/` here defines the method, and `reviews/agent-task-review/` in a case study's repo applies it.
 

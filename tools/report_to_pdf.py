@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Build a PDF of a case study's agent task review report.
 
-The PDF holds the report, then three appendices: the method and the rubric,
-as of the version the report used, and the case study's findings log, printed
-in landscape. Links between these parts become links within the PDF; links to
+The PDF holds the report, then four appendices: the method and the rubric,
+as of the version the report used, the prompts each agent was given, and the
+case study's findings log, printed in landscape. Links between these parts become links within the PDF; links to
 files that aren't included point to GitHub.
 
 Usage:
@@ -75,6 +75,7 @@ pre { background: #f6f8fa; padding: 0.6em; font-size: 8.5pt; white-space: pre-wr
 pre code { background: none; padding: 0; }
 a { color: #0969da; text-decoration: none; }
 hr { border: 0; border-top: 1px solid #d0d7de; }
+blockquote { margin: 0.6em 0 1em; padding: 0 1em; border-left: 3px solid #d0d7de; color: #3d444d; }
 .appendix { break-before: page; }
 .landscape { page: landscape; }
 .landscape table { font-size: 8pt; break-inside: auto; }
@@ -115,13 +116,32 @@ def drop_title(text):
     return re.sub(r"\A# .*\n+", "", text)
 
 
+def prompts(tasks):
+    """Return the standard instructions and each task's prompt from a task file, word for word.
+
+    Each standard instructions section is kept up to its next heading. Each task keeps
+    its ## heading and the blockquote after "**Prompt given to the agent:**"."""
+    out = []
+    for m in re.finditer(r"^## (.*?)\n(.*?)(?=^#{2,3} |^---$|\Z)", tasks, re.S | re.M):
+        heading, body = m.groups()
+        if heading.lower().endswith("standard instructions"):
+            out.append(f"## {heading}\n\n{body.strip()}\n")
+        elif heading.startswith("Task "):
+            prompt = re.search(r"^\*\*Prompt given to the agent:\*\*\n((?:>.*\n)+)", body, re.M)
+            if not prompt:
+                sys.exit(f"The task file's {heading!r} has no prompt.")
+            out.append(f"## {heading}\n\n{prompt.group(1)}")
+    return "\n".join(out)
+
+
 class Linker:
     """Rewrites a part's Markdown links for the combined PDF."""
 
-    def __init__(self, case_repo, case_name, method_tag):
+    def __init__(self, case_repo, case_name, method_tag, prompt_ids=()):
         self.case_repo = case_repo
         self.case_name = case_name
         self.method_tag = method_tag
+        self.prompt_ids = set(prompt_ids)  # heading ids in the prompts appendix
 
     def rewrite(self, text, part, repo, file_dir):
         """part: anchor prefix for this part ("" for the report); repo: "case" or "method";
@@ -146,6 +166,9 @@ class Linker:
                 return self.anchor("", frag) if frag else "#top"
             if resolved == f"{REVIEW_DIR}/findings.md":
                 return self.anchor("findings", frag)
+            # The task file's sections that the prompts appendix reproduces; the rest stays on GitHub.
+            if resolved == f"{REVIEW_DIR}/tasks.md" and frag and frag[1:] in self.prompt_ids:
+                return self.anchor("prompts", frag)
             return f"{GITHUB}/{self.case_name}/blob/main/{resolved}" + (frag or "")
         if resolved in (f"{METHOD_DIR}/method.md", f"{METHOD_DIR}/rubric.md"):
             return self.anchor(Path(resolved).stem, frag)
@@ -226,11 +249,13 @@ def main():
     case_repo = args.case_study.expanduser().resolve()
     report_path = case_repo / REVIEW_DIR / "report.md"
     findings_path = case_repo / REVIEW_DIR / "findings.md"
+    tasks_path = case_repo / REVIEW_DIR / "tasks.md"
     if not report_path.exists():
         sys.exit(f"No report at {report_path}")
     case_name = repo_name(case_repo)
     report = report_path.read_text(encoding="utf-8")
     findings = findings_path.read_text(encoding="utf-8")
+    tasks = tasks_path.read_text(encoding="utf-8")
 
     # The method version: the latest one the report links to.
     used = sorted({m.group(1) for url in MD_LINK.findall(report)
@@ -260,8 +285,10 @@ def main():
                         f"{source.lstrip('v')}, so its Severity section, reproduced from that version, closes this "
                         f"appendix. The report's Main findings section defines the same scale.")
 
-    linker = Linker(case_repo, case_name, tag)
     md = MarkdownIt("commonmark").enable("table").use(anchors_plugin, min_level=1, max_level=6)
+    prompts_md = prompts(tasks)
+    prompt_ids = re.findall(r'<h[1-6] id="([^"]+)"', md.render(prompts_md))
+    linker = Linker(case_repo, case_name, tag, prompt_ids)
 
     title = re.match(r"# (.*)", report).group(1)
     report_md = linker.rewrite(report, "", "case", REVIEW_DIR)
@@ -275,8 +302,15 @@ def main():
         + render(md, f"# Appendix B. Rubric, version {version}\n\n*{rubric_note}*\n\n"
                  + drop_title(linker.rewrite(rubric, "rubric", "method", METHOD_DIR)), "rubric")
         + "</section>",
+        '<section id="prompts" class="appendix">'
+        + render(md, "# Appendix C. Task prompts\n\n*This appendix reproduces, word for word, what each agent "
+                 "was told, from the case study's task file. Each session began with the standard instructions, "
+                 "then the task's prompt. The task file also gives each task's success criteria, which the "
+                 "agents never saw.*\n\n"
+                 + linker.rewrite(prompts_md, "prompts", "case", REVIEW_DIR), "prompts")
+        + "</section>",
         '<section id="findings" class="appendix landscape">'
-        + render(md, "# Appendix C. Findings log\n\n*This appendix reproduces the case study's findings log, "
+        + render(md, "# Appendix D. Findings log\n\n*This appendix reproduces the case study's findings log, "
                  "the evidence behind each finding in the report.*\n\n"
                  + drop_title(linker.rewrite(findings, "findings", "case", REVIEW_DIR)), "findings")
         + "</section>",

@@ -4,7 +4,7 @@ Scripts shared across case studies. Scripts that only one case study needs belon
 
 | Script | What it does |
 | --- | --- |
-| [`report_to_pdf.py`](report_to_pdf.py) | Builds a PDF of a case study's agent task review report, with the method, the rubric, and the findings log as appendices. |
+| [`report_to_pdf.py`](report_to_pdf.py) | Builds a PDF of a case study's agent task review report, with the method, the rubric, the task prompts, and the findings log as appendices. |
 
 ## report_to_pdf.py
 
@@ -12,9 +12,10 @@ The PDF is meant to stand on its own, for example to share with someone who won'
 
 - **The report**, from the case study's `reviews/agent-task-review/report.md`.
 - **Appendix A, the method**, and **Appendix B, the rubric**, from this repo, at the tagged version the report links to. When a report used more than one version, the appendices reproduce the later one. If that version's rubric predates the severity scale, the scale's section is added from the first version that defines it. A note at the start of each appendix says which version it is, and why.
-- **Appendix C, the findings log**, printed in landscape so its tables stay readable.
+- **Appendix C, the task prompts**, from the case study's `reviews/agent-task-review/tasks.md`: each set of standard instructions, and each task's prompt, word for word. The success criteria and the rest of the task file are left out.
+- **Appendix D, the findings log**, printed in landscape so its tables stay readable.
 
-Links between these parts jump within the PDF. Links to files that aren't included, such as the run log or transcripts, point to GitHub.
+Links between these parts jump within the PDF, including links to the parts of the task file that Appendix C reproduces. Links to files that aren't included, such as the run log or transcripts, or to the rest of the task file, point to GitHub.
 
 Every page after the first has the report's title in italics at the top right. Every page's footer has the author, linked to their LinkedIn profile, and the case study's repo, linked to GitHub, on the left, and "Page X of Y" on the right. The author's name and LinkedIn link come from the report's `**Author:**` line, so the script stops if that line is missing. Table rows never break across pages; a row that doesn't fit moves to the next page. The page size is US Letter.
 
