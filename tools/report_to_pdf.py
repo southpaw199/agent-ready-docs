@@ -82,7 +82,13 @@ blockquote { margin: 0.6em 0 1em; padding: 0 1em; border-left: 3px solid #d0d7de
 .landscape { page: landscape; }
 .landscape table { font-size: 8pt; break-inside: auto; }
 .note { color: #57606a; font-style: italic; }
+.toc ul { list-style: none; padding: 0; margin: 0.5em 0 0; }
+.toc li { margin: 0.2em 0; }
+.toc li.gap { margin-top: 0.7em; }
+.toc a { display: flex; color: inherit; }
+.toc .leader { flex: 1; border-bottom: 1px dotted #8c959f; margin: 0 0.4em 0.35em; }
 """
+PROMPTS_POINTER = "[Appendix C](#prompts) gives each task's full prompt, word for word, as the agents received it."
 
 
 def git_show(ref, path):
@@ -181,6 +187,33 @@ class Linker:
         if not frag:
             return f"#{part}"
         return f"#{part}-{frag[1:]}" if part else frag
+
+
+def point_to_prompts(report):
+    """Add a sentence to the report's Summary that points to the prompts appendix:
+    after the Summary's first table, or else at the end of the Summary."""
+    summary = section(report, "Summary")
+    if summary is None:
+        sys.exit("The report has no ## Summary section.")
+    table = re.search(r"^\|.*\n(?!\|)", summary, re.M)
+    end = table.end() if table else len(summary)
+    return report.replace(summary, summary[:end] + "\n" + PROMPTS_POINTER + "\n" + summary[end:].rstrip("\n") + "\n", 1)
+
+
+def contents(entries, pages):
+    """The table of contents. entries: (id, title, starts_group) for each entry;
+    pages: id -> page number, empty on the first pass."""
+    items = "".join(f'<li class="{"gap" if gap else ""}"><a href="#{id_}"><span>{title}</span>'
+                    f'<span class="leader"></span><span>{pages.get(id_, "")}</span></a></li>'
+                    for id_, title, gap in entries)
+    return f'<nav class="toc"><h2>Contents</h2><ul>{items}</ul></nav>\n'
+
+
+def page_numbers(pdf_file):
+    """Map each named destination in the PDF, which Chrome writes for every linked anchor, to its page."""
+    reader = PdfReader(str(pdf_file))
+    return {name.lstrip("/"): reader.get_destination_page_number(dest) + 1
+            for name, dest in reader.named_destinations.items()}
 
 
 def render(md, text, prefix):
@@ -293,9 +326,11 @@ def main():
     linker = Linker(case_repo, case_name, tag, prompt_ids)
 
     title = re.match(r"# (.*)", report).group(1)
-    report_md = linker.rewrite(report, "", "case", REVIEW_DIR)
+    report_md = linker.rewrite(point_to_prompts(report), "", "case", REVIEW_DIR)
+    report_html = render(md, report_md, "")
     parts = [
-        f'<section id="top">{render(md, report_md, "")}</section>',
+        "",  # the report, which holds the table of contents, filled in below
+
         '<section id="method" class="appendix">'
         + render(md, f"# Appendix A. Agent task review method, version {version}\n\n*{method_note}*\n\n"
                  + drop_title(linker.rewrite(method, "method", "method", METHOD_DIR)), "method")
@@ -327,16 +362,38 @@ def main():
     page_css = PAGE_CSS.replace("{title}", css_string(title)).replace("{footer}", css_string(footer))
     footer_links = [(author_name, linkedin), (repo_text, f"https://{repo_text}")]
 
-    page = (f'<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>{html.escape(title)}</title>'
-            f"<style>{page_css}{CSS}</style></head><body>\n" + "\n".join(parts) + "\n</body></html>\n")
+    # Table of contents, below the title and author line: the report's ## sections, then the appendices.
+    entries = [(id_, title_, False) for id_, title_ in re.findall(r'<h2 id="([^"]+)">(.*?)</h2>', report_html)]
+    entries += [(id_, re.search(r"<h1[^>]*>(.*?)</h1>", part).group(1), i == 0)
+                for i, (id_, part) in enumerate(re.findall(r'<section id="([^"]+)" class="appendix[^"]*">(.*?)</section>',
+                                                           "".join(parts), re.S))]
+
+    def page(numbers):
+        parts[0] = f'<section id="top">{report_html.replace("</p>", "</p>" + contents(entries, numbers), 1)}</section>'
+        return (f'<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>{html.escape(title)}</title>'
+                f"<style>{page_css}{CSS}</style></head><body>\n" + "\n".join(parts) + "\n</body></html>\n")
 
     output = (args.output or Path.cwd() / f"{case_name}-report.pdf").expanduser().resolve()
+    browser = find_browser(args.browser)
     work = Path(tempfile.mkdtemp(prefix="report-pdf-"))
     try:
         html_file = work / "report.html"
-        html_file.write_text(page, encoding="utf-8")
         pdf_file = work / "report.pdf"
-        print_pdf(find_browser(args.browser), html_file, pdf_file)
+        # Chrome can't number the contents itself, so print once to find each entry's page, then
+        # again with the numbers, until they stop changing.
+        numbers = {}
+        for _ in range(3):
+            html_file.write_text(page(numbers), encoding="utf-8")
+            pdf_file.unlink(missing_ok=True)
+            print_pdf(browser, html_file, pdf_file)
+            found = page_numbers(pdf_file)
+            if numbers and all(numbers.get(e[0]) == found.get(e[0]) for e in entries):
+                break
+            numbers = found
+        else:
+            sys.exit("The table of contents' page numbers kept changing between printings.")
+        if missing := [e[0] for e in entries if e[0] not in numbers]:
+            sys.exit(f"Couldn't find the page for these contents entries: {', '.join(missing)}")
         pages = len(PdfReader(str(pdf_file)).pages)
         if link_footer(pdf_file, footer_links) != 2 * pages:
             sys.exit("Couldn't find the author and repo in every page's footer, so the footer links are incomplete.")
