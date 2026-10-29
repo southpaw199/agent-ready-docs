@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Build a PDF of a case study's agent task review report.
 
-The PDF holds the report, then four appendices: the method and the rubric,
+The PDF opens with a cover, filled from the case study's report-cover.yaml.
+Then come the report and four appendices: the method and the rubric,
 as of the version the report used, the prompts each agent was given, and the
 case study's findings log, printed in landscape. Links between these parts become links within the PDF; links to
 files that aren't included point to GitHub.
@@ -14,6 +15,8 @@ The PDF is printed with headless Chrome or Edge. In WSL, the Windows browser is
 used. See tools/README.md for setup.
 """
 import argparse
+import base64
+import datetime
 import html
 import os
 import re
@@ -24,6 +27,7 @@ import tempfile
 from pathlib import Path
 
 import pypdfium2 as pdfium
+import yaml
 from markdown_it import MarkdownIt
 from mdit_py_plugins.anchors import anchors_plugin
 from pypdf import PdfReader, PdfWriter
@@ -33,6 +37,8 @@ from pypdf.generic import BooleanObject, DictionaryObject, NameObject, StreamObj
 METHOD_REPO = Path(__file__).resolve().parents[1]
 METHOD_DIR = "methods/agent-task-review"
 REVIEW_DIR = "reviews/agent-task-review"
+COVER_FILE = "report-cover.yaml"
+FONTS = Path(__file__).resolve().parent / "fonts"
 GITHUB = "https://github.com/southpaw199"
 METHOD_LINK = re.compile(
     r"https://github\.com/southpaw199/agent-ready-docs/blob/(v[\d.]+)/methods/agent-task-review/(method|rubric)\.md(#[\w-]+)?$"
@@ -64,13 +70,21 @@ h1 { font-size: 20pt; margin: 0 0 0.4em; }
 h2 { font-size: 14pt; border-bottom: 1px solid #d0d7de; padding-bottom: 0.2em; margin-top: 1.6em; }
 h3 { font-size: 11.5pt; margin-top: 1.3em; }
 h4 { font-size: 10.5pt; }
+h1, h2, h3, .toc-title { color: #9A5B00; }
 h2, h3, h4 { break-after: avoid; }
 table { border-collapse: collapse; width: 100%; margin: 0.6em 0 1em; font-size: 8.8pt; break-inside: avoid; }
 th, td { border: 1px solid #d0d7de; padding: 4px 6px; vertical-align: top; text-align: left; overflow-wrap: break-word; }
 td:first-child { white-space: nowrap; }
 td ul, td ol { margin: 0; padding-left: 1.2em; }
 td li + li, td li ul { margin-top: 0.3em; }
-th { background: #f6f8fa; }
+th { background: #FBF3E6; color: #9A5B00; }
+td.pass { background: #E3F4EA; color: #1E6B3F; }
+td.issues { background: #FDF1DC; color: #7A4A00; }
+td.hints { background: #E6F0FA; color: #1F4E79; }
+td.fail { background: #FBE4E4; color: #8A1F1F; }
+.summary-box { background: #F6F7F9; border: 1px solid #D5DBE1; border-radius: 8px; padding: 16px 18px; margin: 1em 0; }
+.summary-box > p:first-child { margin-top: 0; }
+.summary-box > p:last-child { margin-bottom: 0; }
 thead { display: table-header-group; }
 tr { break-inside: avoid; }
 code { font-family: Consolas, "Courier New", monospace; font-size: 0.92em; background: #f6f8fa; padding: 0 0.2em; border-radius: 3px; }
@@ -91,6 +105,71 @@ blockquote { margin: 0.6em 0 1em; padding: 0 1em; border-left: 3px solid #d0d7de
 .toc .leader { flex: 1; overflow: hidden; white-space: nowrap; margin: 0 0.4em; color: #8c959f; }
 .toc .leader::after { content: "LEADER"; }
 """.replace("LEADER", " ." * 200)  # periods print as dots; a dotted border can print as dashes
+OUTCOMES = {"Pass": "pass", "Pass with issues": "issues", "With issues": "issues",
+            "Pass with hints": "hints", "Fail": "fail"}  # outcome -> its cell's class
+OUTCOME_CELL = re.compile(r"<td([^>]*)>(<strong>)?([^<]+)(</strong>)?</td>")
+FONT_FACES = [("IBM Plex Sans", 400, "IBMPlexSans-Regular"), ("IBM Plex Sans", 600, "IBMPlexSans-SemiBold"),
+              ("IBM Plex Sans", 700, "IBMPlexSans-Bold"), ("IBM Plex Mono", 400, "IBMPlexMono-Regular"),
+              ("IBM Plex Mono", 600, "IBMPlexMono-SemiBold")]
+
+# The cover is printed on its own, with no margins, and put in front of the report afterwards,
+# so it has no header, footer, or page number, and the report's page numbering starts after it.
+COVER_CSS = """
+@page { size: letter; margin: 0; }
+html, body { margin: 0; background: #FFFFFF; }
+.cover { width: 8.5in; height: 11in; box-sizing: border-box; display: flex; flex-direction: column;
+         font-family: "IBM Plex Sans", sans-serif; color: #141A21; background: #FFFFFF; }
+.band { height: 14px; flex: none; background: #F2A93B; }
+.inner { flex: 1; box-sizing: border-box; padding: 72px 72px 0.6in; display: flex; flex-direction: column; }
+/* 32 px between the main blocks and at least 16 px above the footer, a little under the design's 40 px,
+   so that the covers fit on a Letter page. */
+.inner > :not(:first-child) { margin-top: 32px; }
+.steps { margin-bottom: 16px; }
+.head { display: flex; flex-direction: column; gap: 20px; }
+.label { font-family: "IBM Plex Mono", monospace; font-size: 15px; font-weight: 600; letter-spacing: 0.06em;
+         text-transform: uppercase; color: #9A5B00; }
+h1 { margin: 0; font-size: 52px; line-height: 1.05; font-weight: 700; letter-spacing: -0.02em; text-wrap: balance; }
+.question { font-size: 26px; line-height: 1.3; color: #3B4652; }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.stat { border: 1.5px solid #D5DBE1; border-radius: 12px; padding: 24px; display: flex; flex-direction: column; gap: 8px; }
+.stat .n { font-family: "IBM Plex Mono", monospace; font-size: 52px; font-weight: 600; line-height: 1; color: #9A5B00; }
+.stat .t { font-size: 16px; line-height: 1.45; color: #2A333D; }
+.details { border-top: 1.5px solid #D5DBE1; }
+.row { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 16px; padding: 14px 0;
+       border-bottom: 1px solid #E4E8EC; font-size: 16px; line-height: 1.45; }
+.row .k { color: #5B6672; font-weight: 600; }
+.steps { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-family: "IBM Plex Mono", monospace;
+         font-size: 13px; color: #2A333D; }
+.step { border: 1.5px solid #B8C1CA; border-radius: 8px; padding: 8px 12px; white-space: nowrap; }
+.arrow { color: #5B6672; }
+.inner > .foot { margin-top: auto; display: flex; flex-direction: column; gap: 8px; border-top: 1.5px solid #D5DBE1; padding-top: 20px; }
+.foot .name { font-size: 20px; font-weight: 600; }
+.foot .links { font-family: "IBM Plex Mono", monospace; font-size: 13px; color: #3B4652; }
+.foot a { color: inherit; text-decoration: none; }
+.foot .copy { font-size: 12px; color: #5B6672; }
+"""
+COVER_HTML = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>{title}</title><style>{fonts}{css}</style></head><body>
+<div class="cover">
+  <div class="band"></div>
+  <div class="inner">
+    <div class="head">
+      <div class="label">agent-ready-docs · Case study {number}</div>
+      <h1>{title}</h1>
+      <div class="question">{question}</div>
+    </div>
+    <div class="stats">{stats}</div>
+    <div class="details">{details}</div>
+    <div class="steps">{steps}</div>
+    <div class="foot">
+      <div class="name">{author}</div>
+      <div class="links"><a href="{linkedin}">{linkedin_text}</a> · <a href="https://{repo}">{repo}</a></div>
+      <div class="copy">{copyright}</div>
+    </div>
+  </div>
+</div>
+</body></html>
+"""
 COPYRIGHT_LINE = re.compile(r"^Copyright © .+$", re.M)
 XMP = """<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>
 <x:xmpmeta xmlns:x="adobe:ns:meta/">
@@ -220,6 +299,111 @@ def point_to_prompts(report):
     return report.replace(summary, summary[:end] + "\n" + PROMPTS_POINTER + "\n" + summary[end:].rstrip("\n") + "\n", 1)
 
 
+def read_cover(path, release_date):
+    """Read the cover's data file, stopping if it's missing or any field is missing or empty.
+
+    release_date: a date to show as the report release instead of the file's, or None."""
+    if not path.exists():
+        sys.exit(f"No cover data at {path}. See tools/README.md for the fields it needs.")
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as e:
+        sys.exit(f"{path} isn't valid YAML: {e}")
+
+    def text(value, field):
+        if isinstance(value, bool) or not isinstance(value, (str, int, float)) or not str(value).strip():
+            sys.exit(f"{path}: {field} is missing or empty.")
+        return str(value).strip()
+
+    def items(value, field):
+        if not isinstance(value, list) or not value:
+            sys.exit(f"{path}: {field} is missing or empty.")
+        return value
+
+    def pairs(field, keys):
+        out = []
+        for i, item in enumerate(items(data.get(field), field), 1):
+            if not isinstance(item, dict):
+                sys.exit(f"{path}: {field} item {i} needs {' and '.join(keys)}.")
+            out.append(tuple(text(item.get(k), f"{field} item {i}'s {k}") for k in keys))
+        return out
+
+    if not isinstance(data, dict):
+        sys.exit(f"{path} should hold the cover's fields. See tools/README.md.")
+    cover = {k: text(data.get(k), k) for k in ("case_study_number", "title", "question", "repo")}
+    cover["stats"] = pairs("stats", ("number", "text"))
+    cover["details"] = pairs("details", ("label", "value"))
+    cover["method_steps"] = [text(s, f"method_steps item {i}")
+                             for i, s in enumerate(items(data.get("method_steps"), "method_steps"), 1)]
+    if release_date:
+        rows = [i for i, (label, _) in enumerate(cover["details"]) if label == "Report release"]
+        if not rows:
+            sys.exit(f"{path} has no \"Report release\" detail for --release-date to replace.")
+        cover["details"][rows[0]] = ("Report release", f"{release_date:%B} {release_date.day}, {release_date.year}")
+    return cover
+
+
+def release_date(value):
+    try:
+        return datetime.date.fromisoformat(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{value!r} isn't a date like 2026-10-29")
+
+
+def font_faces():
+    """The cover's fonts, as data in the CSS, so the browser embeds these files whatever is installed."""
+    faces = []
+    for family, weight, name in FONT_FACES:
+        data = base64.b64encode((FONTS / f"{name}.woff2").read_bytes()).decode("ascii")
+        faces.append(f'@font-face {{ font-family: "{family}"; font-weight: {weight}; '
+                     f'src: url(data:font/woff2;base64,{data}) format("woff2"); }}')
+    return "\n".join(faces)
+
+
+def cover_page(cover, author, linkedin, copyright):
+    e = lambda s: html.escape(s, quote=True)
+    return COVER_HTML.format(
+        fonts=font_faces(), css=COVER_CSS, title=e(cover["title"]), number=e(cover["case_study_number"]),
+        question=e(cover["question"]),
+        stats="".join(f'<div class="stat"><div class="n">{e(n)}</div><div class="t">{e(t)}</div></div>'
+                      for n, t in cover["stats"]),
+        details="".join(f'<div class="row"><div class="k">{e(k)}</div><div>{e(v)}</div></div>'
+                        for k, v in cover["details"]),
+        steps='<div class="arrow">→</div>'.join(f'<div class="step">{e(s)}</div>' for s in cover["method_steps"]),
+        author=e(author), linkedin=e(linkedin),
+        linkedin_text=e(re.sub(r"^https://(www\.)?", "", linkedin).rstrip("/")),
+        repo=e(cover["repo"]), copyright=e(copyright))
+
+
+def add_cover(pdf_file, cover_file):
+    """Put the cover in front of the report. Viewers show the cover as "Cover" and number the
+    pages after it from 1, as the footers do."""
+    writer = PdfWriter(clone_from=PdfReader(str(pdf_file)))
+    writer.insert_page(PdfReader(str(cover_file)).pages[0], 0)
+    writer.set_page_label(0, 0, prefix="Cover")
+    writer.set_page_label(1, len(writer.pages) - 1, style="/D", start=1)
+    with open(pdf_file, "wb") as f:
+        writer.write(f)
+
+
+def tint_outcomes(text):
+    """Give each table cell whose whole content is an outcome, such as "Pass", its outcome's class."""
+    def tint(m):
+        cls = OUTCOMES.get(m.group(3).strip())
+        if not cls or bool(m.group(2)) != bool(m.group(4)):
+            return m.group(0)
+        return f'<td class="{cls}"{m.group(1)}>' + m.group(0)[len(f"<td{m.group(1)}>"):]
+    return OUTCOME_CELL.sub(tint, text)
+
+
+def box_summary(text):
+    """Put a box around the Summary's opening paragraphs, up to its first table."""
+    m = re.search(r'(<h2 id="summary">.*?</h2>\n)(.*?)(?=<table|<h[1-6])', text, re.S)
+    if not m or not m.group(2).strip():
+        sys.exit("The report's Summary has no opening paragraphs to box.")
+    return text[:m.start(2)] + f'<div class="summary-box">\n{m.group(2)}</div>\n' + text[m.end(2):]
+
+
 def contents(entries, pages):
     """The table of contents. entries: (id, title, starts_group) for each entry;
     pages: id -> page number, empty on the first pass."""
@@ -321,6 +505,8 @@ def main():
     parser.add_argument("-o", "--output", type=Path, help="the PDF to write (default: <repo>-report.pdf here)")
     parser.add_argument("--browser", help="path to Chrome or Edge, if it isn't found automatically")
     parser.add_argument("--html", action="store_true", help="also keep the HTML, to check the layout in a browser")
+    parser.add_argument("--release-date", type=release_date, metavar="YYYY-MM-DD",
+                        help=f"the report release date for the cover, instead of the one in {COVER_FILE}")
     args = parser.parse_args()
 
     case_repo = args.case_study.expanduser().resolve()
@@ -333,6 +519,8 @@ def main():
     report = report_path.read_text(encoding="utf-8")
     findings = findings_path.read_text(encoding="utf-8")
     tasks = tasks_path.read_text(encoding="utf-8")
+    cover_path = case_repo / REVIEW_DIR / COVER_FILE
+    cover = read_cover(cover_path, args.release_date)
 
     # The method version: the latest one the report links to.
     used = sorted({m.group(1) for url in MD_LINK.findall(report)
@@ -368,8 +556,10 @@ def main():
     linker = Linker(case_repo, case_name, tag, prompt_ids)
 
     title = re.match(r"# (.*)", report).group(1)
+    if cover["title"] != title:
+        sys.exit(f"{cover_path}: title {cover['title']!r} doesn't match the report's title, {title!r}.")
     report_md = linker.rewrite(point_to_prompts(report), "", "case", REVIEW_DIR)
-    report_html = render(md, report_md, "")
+    report_html = box_summary(tint_outcomes(render(md, report_md, "")))
     parts = [
         "",  # the report, which holds the table of contents, filled in below
 
@@ -443,6 +633,14 @@ def main():
         pages = len(PdfReader(str(pdf_file)).pages)
         if link_footer(pdf_file, footer_links) != 2 * pages:
             sys.exit("Couldn't find the author and repo in every page's footer, so the footer links are incomplete.")
+        cover_html = work / "cover.html"
+        cover_pdf = work / "cover.pdf"
+        cover_html.write_text(cover_page(cover, author_name, linkedin, copyright.group(0).removeprefix("Copyright ")),
+                              encoding="utf-8")
+        print_pdf(browser, cover_html, cover_pdf)
+        if len(PdfReader(str(cover_pdf)).pages) != 1:
+            sys.exit(f"The cover runs past one page; shorten the text in {cover_path}.")
+        add_cover(pdf_file, cover_pdf)
         add_metadata(pdf_file, title, author_name,
                      "An agent task review report, with the method, rubric, task prompts, and findings log as appendices.",
                      "AI coding agents, documentation, agent task review, agent-ready-docs",
@@ -451,6 +649,7 @@ def main():
         shutil.move(str(pdf_file), output)
         if args.html:
             shutil.copy(html_file, output.with_suffix(".html"))
+            shutil.copy(cover_html, output.with_name(output.stem + "-cover.html"))
     finally:
         shutil.rmtree(work, ignore_errors=True)
     print(f"Wrote {output}")
