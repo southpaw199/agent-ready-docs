@@ -21,6 +21,8 @@ Every page after the first has the report's title in italics at the top right. E
 
 The PDF has bookmarks for every heading, nested as in the document, and opens with them showing. Its document properties give the report's title, the author, a subject, keywords, and the copyright notice. The notice is the "Copyright ©" line from the case study's `COPYRIGHT.md`, so the script stops if that file or line is missing. It's stored where Acrobat shows it under Copyright Status, linked to that file on GitHub. Table rows never break across pages; a row that doesn't fit moves to the next page. The page size is US Letter.
 
+The fonts in [`fonts/`](fonts/) are IBM Plex Sans and IBM Plex Mono, unmodified, from IBM's [Plex releases](https://github.com/IBM/plex/releases), under the [SIL Open Font License 1.1](fonts/OFL.txt).
+
 ### Set up
 
 You need Python 3 and Chrome or Edge. In WSL, the script uses the Windows browser, so nothing else needs installing. From the root of this repo:
@@ -30,7 +32,7 @@ python3 -m venv tools/.venv
 tools/.venv/bin/pip install -r tools/requirements.txt
 ```
 
-`requirements.txt` installs `markdown-it-py` and `mdit-py-plugins`, which turn the Markdown into HTML the way GitHub does, and `pypdf` and `pypdfium2`, which add the footer links after the browser prints the PDF. Browsers print page headers and footers as plain text, so links there have to be added afterwards. Rerun the `pip install` line after pulling a change to `requirements.txt`.
+`requirements.txt` installs `markdown-it-py` and `mdit-py-plugins`, which turn the Markdown into HTML the way GitHub does, and `pypdf` and `pypdfium2`, which add the footer links after the browser prints the PDF, and `PyYAML`, which reads the case study's `report-cover.yaml` for the cover page. Browsers print page headers and footers as plain text, so links there have to be added afterwards. Rerun the `pip install` line after pulling a change to `requirements.txt`.
 
 ### Run
 
