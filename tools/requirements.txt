@@ -2,3 +2,4 @@ markdown-it-py==3.0.0
 mdit-py-plugins==0.4.2
 pypdf==6.21.2
 pypdfium2==4.30.0
+PyYAML==6.0.3
