@@ -7,3 +7,5 @@ The written content in this repository, including the methods, reports, findings
 To request permission, contact Alan Sloan through [LinkedIn](https://www.linkedin.com/in/alansloan).
 
 Code in this repository (Python files, notebooks, and workflows) is licensed separately under the [MIT License](LICENSE).
+
+The font files in `tools/fonts/` are IBM Plex Sans and IBM Plex Mono, © 2017 IBM Corp., licensed under the [SIL Open Font License 1.1](tools/fonts/OFL.txt). Neither this notice nor the MIT License covers them.

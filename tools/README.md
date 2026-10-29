@@ -10,6 +10,7 @@ Scripts shared across case studies. Scripts that only one case study needs belon
 
 The PDF is meant to stand on its own, for example to share with someone who won't browse the repos. It holds:
 
+- **A cover**, filled from the case study's `reviews/agent-task-review/report-cover.yaml`. It has no header, footer, or page number, and the page numbers start after it.
 - **The report**, from the case study's `reviews/agent-task-review/report.md`, with two additions that exist only in the PDF: a table of contents below the title and author line, listing the report's sections and the appendices with their page numbers, and a sentence after the Summary's task table pointing to Appendix C.
 - **Appendix A, the method**, and **Appendix B, the rubric**, from this repo, at the tagged version the report links to. When a report used more than one version, the appendices reproduce the later one. If that version's rubric predates the severity scale, the scale's section is added from the first version that defines it. A note at the start of each appendix says which version it is, and why.
 - **Appendix C, the task prompts**, from the case study's `reviews/agent-task-review/tasks.md`: each set of standard instructions, and each task's prompt, word for word. The success criteria and the rest of the task file are left out.
@@ -17,9 +18,35 @@ The PDF is meant to stand on its own, for example to share with someone who won'
 
 Links between these parts jump within the PDF, including links to the parts of the task file that Appendix C reproduces. Links to files that aren't included, such as the run log or transcripts, or to the rest of the task file, point to GitHub.
 
-Every page after the first has the report's title in italics at the top right. Every page's footer has the author, linked to their LinkedIn profile, and the case study's repo, linked to GitHub, on the left, and "Page X of Y" on the right. The author's name and LinkedIn link come from the report's `**Author:**` line, so the script stops if that line is missing. Browsers can't number a table of contents, so the script prints the PDF twice: once to find the page each section starts on, and again with those page numbers filled in.
+Every page after the report's first has the report's title in italics at the top right. Every page's footer has the author, linked to their LinkedIn profile, and the case study's repo, linked to GitHub, on the left, and "Page X of Y" on the right. The author's name and LinkedIn link come from the report's `**Author:**` line, so the script stops if that line is missing. Browsers can't number a table of contents, so the script prints the PDF twice: once to find the page each section starts on, and again with those page numbers filled in.
 
 The PDF has bookmarks for every heading, nested as in the document, and opens with them showing. Its document properties give the report's title, the author, a subject, keywords, and the copyright notice. The notice is the "Copyright ©" line from the case study's `COPYRIGHT.md`, so the script stops if that file or line is missing. It's stored where Acrobat shows it under Copyright Status, linked to that file on GitHub. Table rows never break across pages; a row that doesn't fit moves to the next page. The page size is US Letter.
+
+In the report, headings and table header rows are amber, the outcome in each results table cell is tinted (green for pass, amber for pass with issues, blue for pass with hints, red for fail), and the Summary's opening paragraphs are in a box. The appendices keep their plain styling, apart from the table header rows.
+
+### The cover
+
+The cover's content comes from `report-cover.yaml`, next to the report. Its fields:
+
+```yaml
+case_study_number: 1
+title: "LanceDB: Agent Task Review Report"   # must match the report's # title
+question: "Do the docs work for AI agents?"
+stats:                                       # shown as boxes, two to a row
+  - number: "5/5"
+    text: "tasks passed by both agents, with no hints"
+details:                                     # label and value rows
+  - label: "Report release"
+    value: "October 29, 2026"
+method_steps: ["real tasks", "docs only", "findings with fixes"]
+repo: "github.com/southpaw199/agent-ready-lancedb"
+```
+
+The script stops, naming the file and field, if the file is missing or a field is missing or empty. It also stops if the cover's text runs past one page. The author's name and LinkedIn link come from the report's `**Author:**` line, and the copyright line from `COPYRIGHT.md`, as for the footer and the document properties.
+
+Update the "Report release" date when you make a new release, to match its `report-YYYY-MM-DD` tag, or pass `--release-date`.
+
+The cover's fonts, in [`fonts/`](fonts/), are IBM Plex Sans and IBM Plex Mono, unmodified, from IBM's [Plex releases](https://github.com/IBM/plex/releases), under the [SIL Open Font License 1.1](fonts/OFL.txt).
 
 ### Set up
 
@@ -30,7 +57,7 @@ python3 -m venv tools/.venv
 tools/.venv/bin/pip install -r tools/requirements.txt
 ```
 
-`requirements.txt` installs `markdown-it-py` and `mdit-py-plugins`, which turn the Markdown into HTML the way GitHub does, and `pypdf` and `pypdfium2`, which add the footer links after the browser prints the PDF. Browsers print page headers and footers as plain text, so links there have to be added afterwards. Rerun the `pip install` line after pulling a change to `requirements.txt`.
+`requirements.txt` installs `markdown-it-py` and `mdit-py-plugins`, which turn the Markdown into HTML the way GitHub does, and `pypdf` and `pypdfium2`, which add the footer links after the browser prints the PDF, and `PyYAML`, which reads the case study's `report-cover.yaml` for the cover page. Browsers print page headers and footers as plain text, so links there have to be added afterwards. Rerun the `pip install` line after pulling a change to `requirements.txt`.
 
 ### Run
 
@@ -45,7 +72,8 @@ That writes `agent-ready-lancedb-report.pdf` to the current folder. Options:
 | Option | Use |
 | --- | --- |
 | `-o PATH` | Write the PDF somewhere else. |
-| `--html` | Also keep the HTML next to the PDF, to check the layout in a browser. |
+| `--html` | Also keep the HTML next to the PDF, to check the layout in a browser. The cover's is in a separate file ending in `-cover.html`. |
+| `--release-date YYYY-MM-DD` | Show this date as the cover's report release, instead of the one in `report-cover.yaml`. |
 | `--browser PATH` | Use a specific Chrome or Edge, if the script doesn't find one. |
 
 The PDF is built from the files as they are on disk, including uncommitted changes, so check that the case study's repo is on the branch you mean to share.
