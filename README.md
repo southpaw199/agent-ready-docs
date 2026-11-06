@@ -49,6 +49,7 @@ Each case study has its own repo, listed below.
 | --- | --- |
 | [`methods/`](methods/) | Reusable evaluation methods. Each method defines its procedure, scoring rubric, and templates. |
 | [`tools/`](tools/) | Scripts shared across case studies, such as [`report_to_pdf.py`](tools/report_to_pdf.py), which builds a PDF of a case study's report with the method, rubric, task prompts, and findings log as appendices. |
+| [`lessons-learned.md`](lessons-learned.md) | Observations from running the case studies that aren't docs findings, but matter to anyone working alongside an AI agent. |
 
 A method's folder name is the same everywhere it appears: `methods/agent-task-review/` here defines the method, and `reviews/agent-task-review/` in a case study's repo applies it.
 
