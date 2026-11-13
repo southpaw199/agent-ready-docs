@@ -4,7 +4,7 @@ Observations from running the case studies that aren't findings about the produc
 
 ## agent-ready-gitlab
 
-Case study 3, on GitLab's CI/CD and REST API docs, is in progress. These notes come from setting up its test group, reviewer token, setup scripts and checkers, with Claude Code doing most of the scripting and the reviewer running every command that touched credentials or pushed code.
+Case study 3, on GitLab's CI/CD and REST API docs, is in progress. These notes come from setting up its test group, reviewer token, setup scripts and checkers, and from running the first agent's sessions. Claude Code did most of the scripting and reviewing, and the reviewer ran every command that touched credentials or pushed code.
 
 ### The agent guided a web form it couldn't see
 
@@ -84,4 +84,49 @@ Saved job logs are evidence and must stay exactly as GitLab returned them. Twice
 
 Seeding a project with 105 merge requests, each with its own commit, got through about 70 before GitLab.com answered 429 Too Many Requests. Earlier, a missing permission had stopped the same seed after two.
 
-**Takeaway:** scripts that create test data in bulk should be able to resume, skipping what already exists, and should wait and retry on rate limits instead of failing. Otherwise every interruption means starting over, and usually means another project or credential to clean up.
+**Takeaway:** scripts that create test data in bulk should be able to resume, skipping what already exists, and should wait and retry on rate limits instead of failing. Otherwise every interruption means starting over, and usually means another project or credential to clean up. It paid off on the day of the runs: seeding a rerun project timed out halfway, and `--resume` finished it in one command.
+
+### The test agent would have inherited the reviewer's setup
+
+The agent under test runs on the reviewer's machine, so before the first session it would have picked up everything set up there for the reviewer's own work. That included:
+- personal instructions saying never to commit on `main`, which the task's prompt asks for;
+- a global Git hook that blocks those commits;
+- plugins, and skills synced from claude.ai, which came back after each sync until they were turned off in settings;
+- an SSH agent started by `.bashrc` in every new terminal;
+- a credential manager that might hold a saved GitLab login.
+
+Any of these could have changed what the agent did, or let it push.
+
+Each was turned off for the runs, and each has a test that shows it worked: `git ls-remote` from the run folder must fail with "could not read Username", and `ssh -T git@gitlab.com` must be refused.
+
+**Takeaway:** an agent works with whatever your environment gives it, not just what the prompt says. List what it inherits, including instructions files, hooks, plugins, credential helpers and agents started from shell profiles. Then prove each one is off with a command that would fail if it weren't, rather than by reading config.
+
+### The reviewer's notes were pasted into the prompt
+
+The instructions for one task showed the prompt in a code block, followed by the reviewer's own notes: approve the script, deny any command that prints the token, watch the API calls. All of it was copied into the agent's message. None of it was help with the docs, but it told the agent that its handling of the token was being watched, and the task records exactly that. The run couldn't be compared with the others. The agent had already changed the test project. When told the run was invalid, it offered to undo its changes, which would have meant more live API calls with its token. Instead, everything was left as it was, the token was revoked, and the task was run again from the start in a new project, with a new token.
+
+**Takeaway:** keep the text to paste physically separate from the notes about it, ideally in its own file or block with nothing after it. When a run is spoiled, don't ask the agent to repair the damage. Start again somewhere clean, and record what the spoiled run did.
+
+### Empty variables failed quietly
+
+The commands that save a run's evidence use variables set in the setup terminal, such as `$RUN` and `$F`. Run once in the agent's terminal by mistake, where those variables were empty, they didn't stop. `mkdir -p "runs/$RUN/G2"` made a stray folder inside the run folder, and only the `mv` failed, with "cannot stat '/transcript.md'". On other occasions, a restarted setup terminal had lost its variables, and `$F` still pointed to the previous task's folder.
+
+**Takeaway:** begin each block of commands with a line that shows its key variables, such as `echo "RUN=$RUN"`, and stop if it's empty. `set -u` makes the shell refuse to use an unset variable. Scripts that need a variable should fail with its name, as these did.
+
+### An export can include more than the agent's session
+
+The transcript of a session is exported after the agent finishes. In one task, `/status` was run before the export, and its output, with the account's email address, came at the end of the transcript. It was removed before the transcript was committed.
+
+**Takeaway:** export the conversation before running anything else in it. Search every transcript for personal details before committing it. Anything shown on screen can end up in the export, not just the agent's work.
+
+### The page the agent read was a summary
+
+Claude Code's fetch tool passes each page through a model that answers the agent's question about it, so the agent doesn't get the page's full text. Two agents noticed. One said the tool had left out a code block, so it put the rules together from the page's text. Another saw that the summary had rewritten a `docker login` line into syntax that works only in bash, not the plain `sh` the CI job uses. It fetched the page again and used the page's own line.
+
+**Takeaway:** when an agent says it took something from a page, it may have been working from a paraphrase. Check its citations against the page itself. The best agents treat the summary as a lead, not a quotation.
+
+### The docs changed between planning and the runs
+
+Eleven days after the tasks were planned, the page that lists each REST endpoint's token permissions had moved to a new address, and was public. Before, it had redirected to a sign-in page. That changed one of the expected findings, and the agent in that task used the new page. Two other addresses that had returned 403 now returned 404.
+
+**Takeaway:** recheck every entry point on the day of the runs, and record what changed. Docs are live, and a finding planned against last week's site may no longer be true.
