@@ -49,3 +49,39 @@ The agent wrote a helper that builds a `git clone` command with a one-off creden
 The G1 checker reads GitLab job logs to confirm that pytest ran and that pip used the cache. Its tests passed on sample logs the agent had written. On the first real run it scored two checks as failures, although the pipelines had passed. GitLab.com starts every line of a job log with a timestamp and stream tag, which the sample logs didn't include. A second pattern matched the runner's helper image, not the job's image. Both were fixed, and the real logs are now part of the tests.
 
 **Takeaway:** tests an agent writes for its own code share its assumptions. Check parsers against a real artifact as early as you can, and keep that artifact as a test fixture. This is the same rule the method applies to agents' runs: an agent saying it succeeded isn't evidence that it did.
+
+### Seven tokens to get the permissions right
+
+The reviewer's scripts use a fine-grained GitLab token, and it took seven versions of it, over two days, to cover what they needed. Each gap showed up only when a script happened to make the call that needed it, and fine-grained tokens can't be edited, so every gap meant a new token. The gaps had several causes:
+
+- **Permissions sat under unexpected resources.** Reading files needs Repository: Read, which searching the form for "file" doesn't find. Merging needs Merge Request: Merge, separate from Update. Protecting a branch needs Branch: Protect, although the Protected Branch resource is where you'd look, and it offers only Read and Update.
+- **One permission went in at the wrong level.** Creating projects is a user-level permission, and it was added under the group, where it does nothing.
+- **Re-entering a dozen permissions by hand dropped some.** Branch: Read went missing on one token, Repository: Read on another.
+
+GitLab deserves credit here: every refusal named the exact missing permission, so each fix took one step once it was found.
+
+**Takeaway:** when an agent helps you set up credentials, have it also write a check that exercises every read permission the work needs, and run it right after creating each token. Ours, `check_token.py`, makes one harmless request per permission and names any that are refused. Write permissions can't be checked without changing something, so list them and check them by eye, or test them early with a throwaway project rather than halfway through real work.
+
+### "The new token" meant a different token to each of us
+
+At one point there were two tokens: the reviewer's, for the setup scripts, and a smaller one for a single project. The reviewer created a replacement for the project token. The agent assumed it was the reviewer's token, and spent several rounds of checks puzzling over why "the new token" still lacked a permission. Each check passed, but only because it was testing the old reviewer token, which hadn't been replaced at all.
+
+**Takeaway:** when there's more than one credential, name each one every time, in instructions and in questions, and keep each in its own clearly named file. An agent that hears "I created the new token" should ask which one before building on the answer.
+
+### A deliberately wrong answer found a gap in the checker
+
+Each task's checker was first run against a correct reference solution, and passed it. For two tasks, a control run followed: a configuration with the exact mistake the task is designed to catch. For G2, a duplicate-pipeline trap, the checker failed it as intended. For G3, a stage that isn't listed, the checker passed the criterion meant to catch it. GitLab rejects that configuration, but leaves the pipeline's `yaml_errors` field empty, and the checker relied on that field. The fix was to require at least one job as well, and the control now fails as it should.
+
+**Takeaway:** a checker that passes a good answer has shown only half of what it must. Run at least one known-bad answer through it, ideally the mistake the task is about, before trusting it to score anyone else's work.
+
+### Evidence was nearly changed twice by tools meant to help
+
+Saved job logs are evidence and must stay exactly as GitLab returned them. Twice, they nearly didn't. Once, the logs were saved while a check was still running, so one log was cut off mid-job. Another time, the pre-commit hooks reformatted a set of logs saved one folder deeper than the exclude pattern covered. They were restored from the staged copies.
+
+**Takeaway:** don't rely on instructions about order or folder layout to protect evidence. Make the tools notice themselves: the log saver now refuses to report success while a job is still running. And when you add a new place for evidence, run the hooks over everything once and check that nothing changed.
+
+### Seeding at scale meets rate limits
+
+Seeding a project with 105 merge requests, each with its own commit, got through about 70 before GitLab.com answered 429 Too Many Requests. Earlier, a missing permission had stopped the same seed after two.
+
+**Takeaway:** scripts that create test data in bulk should be able to resume, skipping what already exists, and should wait and retry on rate limits instead of failing. Otherwise every interruption means starting over, and usually means another project or credential to clean up.
