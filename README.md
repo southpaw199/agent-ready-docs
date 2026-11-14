@@ -32,7 +32,7 @@ Everything needed to check a finding: the tasks and success criteria, reference 
 
 ## Status
 
-The method is at version 0.4, a draft that improves as each case study tests it. Each version is tagged, and its [changelog](methods/agent-task-review/method.md#changelog) says what changed. Both case studies, LanceDB and NVIDIA OpenUSD, are complete. A related case study on NVIDIA's Omniverse and Isaac Sim, which are built on OpenUSD, is a possible future project.
+The method is at version 0.5, a draft that improves as each case study tests it. Each version is tagged, and its [changelog](methods/agent-task-review/method.md#changelog) says what changed. Both case studies, LanceDB and NVIDIA OpenUSD, are complete. A related case study on NVIDIA's Omniverse and Isaac Sim, which are built on OpenUSD, is a possible future project.
 
 Each case study has its own repo, listed below.
 
