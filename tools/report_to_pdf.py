@@ -5,7 +5,8 @@ The PDF opens with a cover, filled from the case study's report-cover.yaml.
 Then come the report and four appendices: the method and the rubric,
 as of the version the report used, the prompts each agent was given, and the
 case study's findings log, printed in landscape. Links between these parts become links within the PDF; links to
-files that aren't included point to GitHub.
+files that aren't included point to the case study's repo, on GitHub or GitLab, or for the method, to agent-ready-docs
+on GitHub.
 
 Usage:
     python tools/report_to_pdf.py ~/projects/agent-ready-lancedb
@@ -205,11 +206,19 @@ def version_key(tag):
     return tuple(int(n) for n in tag.lstrip("v").split("."))
 
 
-def repo_name(repo):
+def repo_url(repo):
+    """Return the case study repo's web address, from its origin remote on github.com or gitlab.com,
+    in SSH or HTTPS form. Without one, assume github.com/southpaw199/<folder name>."""
     url = subprocess.run(["git", "-C", str(repo), "remote", "get-url", "origin"],
                          capture_output=True, text=True).stdout.strip()
-    m = re.search(r"github\.com[/:]southpaw199/([\w.-]+?)(?:\.git)?$", url)
-    return m.group(1) if m else repo.name
+    m = re.search(r"(github\.com|gitlab\.com)[/:]([\w.-]+(?:/[\w.-]+)+)$", re.sub(r"\.git$", "", url))
+    return f"https://{m.group(1)}/{m.group(2)}" if m else f"{GITHUB}/{repo.name}"
+
+
+def file_url(base, path):
+    """Return the web address of a file on main in the repo at base, as GitHub or GitLab writes it."""
+    blob = "/-/blob/main/" if base.startswith("https://gitlab.com/") else "/blob/main/"
+    return base + blob + path
 
 
 def section(text, heading):
@@ -244,9 +253,9 @@ def prompts(tasks):
 class Linker:
     """Rewrites a part's Markdown links for the combined PDF."""
 
-    def __init__(self, case_repo, case_name, method_tag, prompt_ids=()):
+    def __init__(self, case_repo, case_url, method_tag, prompt_ids=()):
         self.case_repo = case_repo
-        self.case_name = case_name
+        self.case_url = case_url
         self.method_tag = method_tag
         self.prompt_ids = set(prompt_ids)  # heading ids in the prompts appendix
 
@@ -273,10 +282,10 @@ class Linker:
                 return self.anchor("", frag) if frag else "#top"
             if resolved == f"{REVIEW_DIR}/findings.md":
                 return self.anchor("findings", frag)
-            # The task file's sections that the prompts appendix reproduces; the rest stays on GitHub.
+            # The task file's sections that the prompts appendix reproduces; the rest stays in the repo.
             if resolved == f"{REVIEW_DIR}/tasks.md" and frag and frag[1:] in self.prompt_ids:
                 return self.anchor("prompts", frag)
-            return f"{GITHUB}/{self.case_name}/blob/main/{resolved}" + (frag or "")
+            return file_url(self.case_url, resolved) + (frag or "")
         if resolved in (f"{METHOD_DIR}/method.md", f"{METHOD_DIR}/rubric.md"):
             return self.anchor(Path(resolved).stem, frag)
         return f"{GITHUB}/agent-ready-docs/blob/{self.method_tag}/{resolved}" + (frag or "")
@@ -515,7 +524,8 @@ def main():
     tasks_path = case_repo / REVIEW_DIR / "tasks.md"
     if not report_path.exists():
         sys.exit(f"No report at {report_path}")
-    case_name = repo_name(case_repo)
+    case_url = repo_url(case_repo)
+    case_name = case_url.rsplit("/", 1)[1]
     report = report_path.read_text(encoding="utf-8")
     findings = findings_path.read_text(encoding="utf-8")
     tasks = tasks_path.read_text(encoding="utf-8")
@@ -553,7 +563,7 @@ def main():
     md = MarkdownIt("commonmark").enable("table").use(anchors_plugin, min_level=1, max_level=6)
     prompts_md = prompts(tasks)
     prompt_ids = re.findall(r'<h[1-6] id="([^"]+)"', md.render(prompts_md))
-    linker = Linker(case_repo, case_name, tag, prompt_ids)
+    linker = Linker(case_repo, case_url, tag, prompt_ids)
 
     title = re.match(r"# (.*)", report).group(1)
     if cover["title"] != title:
@@ -589,10 +599,10 @@ def main():
     if not author:
         sys.exit("The report has no **Author:** line with a LinkedIn link, which the footer needs.")
     author_name, linkedin = author.groups()
-    repo_text = f"github.com/southpaw199/{case_name}"
+    repo_text = case_url.removeprefix("https://")
     footer = f"Author: {author_name} · {repo_text}"
     page_css = PAGE_CSS.replace("{title}", css_string(title)).replace("{footer}", css_string(footer))
-    footer_links = [(author_name, linkedin), (repo_text, f"https://{repo_text}")]
+    footer_links = [(author_name, linkedin), (repo_text, case_url)]
     copyright_file = case_repo / "COPYRIGHT.md"
     copyright = COPYRIGHT_LINE.search(copyright_file.read_text(encoding="utf-8")) if copyright_file.exists() else None
     if not copyright:
@@ -644,7 +654,7 @@ def main():
         add_metadata(pdf_file, title, author_name,
                      "An agent task review report, with the method, rubric, task prompts, and findings log as appendices.",
                      "AI coding agents, documentation, agent task review, agent-ready-docs",
-                     copyright.group(0), f"{GITHUB}/{case_name}/blob/main/COPYRIGHT.md")
+                     copyright.group(0), file_url(case_url, "COPYRIGHT.md"))
         output.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(pdf_file), output)
         if args.html:
