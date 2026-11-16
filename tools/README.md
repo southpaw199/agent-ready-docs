@@ -22,7 +22,7 @@ Every page after the report's first has the report's title in italics at the top
 
 The PDF has bookmarks for every heading, nested as in the document, and opens with them showing. Its document properties give the report's title, the author, a subject, keywords, and the copyright notice. The notice is the "Copyright ©" line from the case study's `COPYRIGHT.md`, so the script stops if that file or line is missing. It's stored where Acrobat shows it under Copyright Status, linked to that file in the case study's repo. Table rows never break across pages; a row that doesn't fit moves to the next page. The page size is US Letter.
 
-In the report, headings and table header rows are amber, the outcome in each results table cell is tinted (green for pass, amber for pass with issues, blue for pass with hints, red for fail), and the Summary's opening paragraphs are in a box. The appendices keep their plain styling, apart from the table header rows.
+In the report, headings and table header rows are amber, the outcome in each results table cell is tinted (green for pass, amber for pass with issues, blue for pass with hints, red for fail), and the Summary starts on a new page, with its opening paragraphs in a box. The appendices keep their plain styling, apart from the table header rows.
 
 ### The cover
 

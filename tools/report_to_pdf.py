@@ -94,6 +94,7 @@ pre code { background: none; padding: 0; }
 a { color: #0969da; text-decoration: none; }
 hr { border: 0; border-top: 1px solid #d0d7de; }
 blockquote { margin: 0.6em 0 1em; padding: 0 1em; border-left: 3px solid #d0d7de; color: #3d444d; }
+h2#summary { break-before: page; }
 .appendix { break-before: page; }
 .landscape { page: landscape; }
 .landscape table { font-size: 8pt; break-inside: auto; }
