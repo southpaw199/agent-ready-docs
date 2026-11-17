@@ -4,7 +4,7 @@ Observations from running the case studies that aren't findings about the produc
 
 ## agent-ready-gitlab
 
-Case study 3, on GitLab's CI/CD and REST API docs, is in progress. These notes come from setting up its test group, reviewer token, setup scripts and checkers, and from running the first agent's sessions. Claude Code did most of the scripting and reviewing, and the reviewer ran every command that touched credentials or pushed code.
+Case study 3, on GitLab's CI/CD and REST API docs, is complete, and its [report](https://gitlab.com/sp199-group/agent-ready-gitlab/-/blob/main/reviews/agent-task-review/report.md) is published. These notes come from setting up its test group, reviewer token, setup scripts and checkers; from running both tiers, docs only and with GitLab's MCP server; and from writing up and publishing the results. Claude Code did most of the scripting, reviewing and drafting, and the reviewer ran every command that touched credentials or pushed code.
 
 ### The agent guided a web form it couldn't see
 
@@ -130,3 +130,69 @@ Claude Code's fetch tool passes each page through a model that answers the agent
 Eleven days after the tasks were planned, the page that lists each REST endpoint's token permissions had moved to a new address, and was public. Before, it had redirected to a sign-in page. That changed one of the expected findings, and the agent in that task used the new page. Two other addresses that had returned 403 now returned 404.
 
 **Takeaway:** recheck every entry point on the day of the runs, and record what changed. Docs are live, and a finding planned against last week's site may no longer be true.
+
+### A missing permission looked like missing data
+
+In Tier 2, each agent reached its project through GitLab's MCP server, with a token limited to that agent's projects. The first token lacked the Code permissions. Commits through the server were refused, but reading the project wasn't: `get_project` answered normally, with `default_branch: null`, as if the project had no branches. Nothing said a permission was missing. The run was voided and started again with a corrected token.
+
+**Takeaway:** an MCP server can turn a refusal into an empty answer. Before a run, test the token with the same tools the agent will use, including one write, and treat a null where you expect a value as a possible permissions problem, not a fact about the project.
+
+### Both agents reached for the script's token
+
+In G5, each agent wrote a script that reads its token from `GITLAB_TOKEN`. In Tier 2, after `git pull` failed for lack of credentials, both agents tried to fix it the same way: by building a credential helper that would hand `GITLAB_TOKEN` to git. Neither would have printed the token, and the run folders couldn't push anyway, but the token was meant for the script, not for git. The reviewer denied both.
+
+**Takeaway:** an agent uses whatever credential is in reach to get unstuck. Give a token only to the process that needs it, and read each command you approve for where it sends a credential, not only for whether it prints one.
+
+### Copying from the agent interrupted it
+
+The reviewer wanted to copy a command Codex was asking to run, to check it before approving, and pressed Ctrl-C. In the terminal, Ctrl-C interrupts the agent, so the turn stopped and the command never ran. Denying a command stopped the turn in the same way, and Codex waited to be told how to continue.
+
+**Takeaway:** in a terminal agent, copy with the mouse or Ctrl+Shift+C, never Ctrl-C. Expect a denial or an interruption to stop the turn, and say what to do next instead of waiting.
+
+### An early export blocked the final one
+
+After the interruption, the session was exported partway through, to `transcript.md`. At the end, the full export to the same name failed, because Codex won't overwrite an existing file. It worked with a new name.
+
+**Takeaway:** export only once, at the end, or give an early export a name of its own. Then check the file you keep covers the whole session, from the prompt to the agent's last message.
+
+### Resuming skipped a step that could fail
+
+During a rerun, a setup script's first commit failed with a 404 moments after GitLab created the project, and the project had to be deleted and made again. Checking the G5 seeding script for the same failure showed that its `--resume` would have skipped the missing commit and gone straight to the merge requests. Their first branch would then have become the project's default branch, with no `main`. The script now checks for `main` first, makes the commit if the project is empty, and stops if it has commits but no `main`.
+
+**Takeaway:** a resume step should check that every earlier step happened, not just pick up after the last one it remembers. The failure that matters is often the very first call after creating something, before the server has caught up.
+
+### The transcript trimmer mislabeled its own notes
+
+The Tier 2 transcripts were trimmed for the repo: long blocks of docs output were replaced by a note naming the pages they came from. The first versions of the trimmer named the wrong pages in some notes. It hadn't matched commands that built file names in code, and one agent fetched the same file name from two addresses. A reader would have thought the agent read a page it didn't. Matching each block to the most recent fetch before it fixed all but one note, which was corrected by hand.
+
+**Takeaway:** a note a tool adds to evidence is a claim, and needs checking like any other. Compare every note against the original transcript before committing, as with the job logs in "Evidence was nearly changed twice by tools meant to help".
+
+### The agent's drafts misstated its own records
+
+Claude Code drafted the findings and the report from the run records it had helped write. Two claims were wrong. One said the Tier 1 agents had left out a setting that both had in fact used. The other said eight of the ten agents checked their pipelines, which suggests two didn't. The two were the G5 runs, which have no pipelines: all eight agents that could check, did. Both were caught by checking each claim against the run records before staging.
+
+**Takeaway:** an agent's summary of records is a draft, even when it wrote the records. Check every number and every "both" or "all" against the source before it's published.
+
+### Secrets outlived the runs
+
+An audit after the last run found more left behind than expected:
+- a temporary token from one of the Tier 2 runs, still active;
+- a token in the shell's history, from an `export` typed at the prompt;
+- the reviewer's token in a session export from early in the setup;
+- a file in the downloads folder holding three tokens.
+
+Every token the case study created was revoked, and the copies deleted.
+
+**Takeaway:** end every project by listing every token it created and revoking each one, then search shell history, session exports and downloads for copies. Revoking makes a leftover copy useless, but finding it still matters.
+
+### A settings backup saved the wrong settings
+
+Some of the reviewer's Claude Code settings were changed for the runs, such as turning off auto memory. The backup of the settings file was only taken a day later, when other changes were needed. It already held the run settings, so restoring it after the runs left them in place, and they had to be removed by hand.
+
+**Takeaway:** back up a configuration before the first change, not when you next think of it. Before relying on a backup, look at what it holds.
+
+### "Like the previous graphics" meant a file the agent hadn't seen
+
+Asked for a LinkedIn graphic like the ones for the earlier case studies, Claude Code matched the GitHub social previews it had seen. The LinkedIn graphics were a different design, in a file it hadn't seen. It took two rounds to find out. Later, it said the post's text matched the graphic's three patterns without comparing them; they covered the same ground, but in a different order and shape.
+
+**Takeaway:** when you ask an agent to match something, give it the exact file. Ask it to compare against that file before it says the two match, and to say which file it compared against.
