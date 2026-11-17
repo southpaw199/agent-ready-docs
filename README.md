@@ -32,7 +32,7 @@ Everything needed to check a finding: the tasks and success criteria, reference 
 
 ## Status
 
-The method is at version 0.5, a draft that improves as each case study tests it. Each version is tagged, and its [changelog](methods/agent-task-review/method.md#changelog) says what changed. Both case studies, LanceDB and NVIDIA OpenUSD, are complete. A related case study on NVIDIA's Omniverse and Isaac Sim, which are built on OpenUSD, is a possible future project.
+The method is at version 0.5, a draft that improves as each case study tests it. Each version is tagged, and its [changelog](methods/agent-task-review/method.md#changelog) says what changed. All three case studies, LanceDB, NVIDIA OpenUSD, and GitLab, are complete. A related case study on NVIDIA's Omniverse and Isaac Sim, which are built on OpenUSD, is a possible future project.
 
 Each case study has its own repo, listed below.
 
@@ -42,6 +42,7 @@ Each case study has its own repo, listed below.
 | --- | --- | --- |
 | [LanceDB](https://github.com/southpaw199/agent-ready-lancedb) | Agent task review, with Claude Code and Codex | Both agents passed 5 of 5 tasks; 4 main findings, led by deprecated APIs in the sync Python examples. [Report](https://github.com/southpaw199/agent-ready-lancedb/blob/main/reviews/agent-task-review/report.md) |
 | [NVIDIA OpenUSD](https://github.com/southpaw199/agent-ready-nvidia) | Agent task review, with Claude Code and Codex, then rerun with NVIDIA's USD Code MCP server | Both agents completed 5 of 5 OpenUSD tasks with no hints; 2 main findings, led by Python names missing from the C++-only API reference. [Report](https://github.com/southpaw199/agent-ready-nvidia/blob/main/reviews/agent-task-review/report.md) |
+| [GitLab CI/CD and REST API](https://gitlab.com/sp199-group/agent-ready-gitlab) | Agent task review, with Claude Code and Codex, then rerun with GitLab's MCP server connected to each task's project | All 20 runs met every success criterion, with one hint, from a token; 4 main findings, led by G1's examples sitting on pages the main pages barely link to. [Report](https://gitlab.com/sp199-group/agent-ready-gitlab/-/blob/main/reviews/agent-task-review/report.md) |
 
 ## How this repo is organized
 
